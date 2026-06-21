@@ -1,0 +1,8 @@
+{
+  "name": "Remix: 采购商务工作台",
+  "description": "单人采购商务工作台，用于管理需求项目、合同关联、进度跟踪、到期提醒及自定义采购工作流。",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
