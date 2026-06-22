@@ -64,7 +64,7 @@ interface AppContextProps {
 
   // Database Backup / Restore Actions
   backups: BackupFile[];
-  createBackup: (type: 'auto' | 'manual') => { success: boolean; filename: string; error?: string };
+  createBackup: (type: 'auto' | 'manual') => Promise<{ success: boolean; filename: string; error?: string }>;
   restoreBackup: (filename: string) => Promise<{ success: boolean; error?: string }>;
   deleteBackup: (filename: string) => void;
   exportDatabase: () => void;
@@ -373,7 +373,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [projects, contracts, preWorkflow, postWorkflow, bids, bidWorkflow, allTags, knowledgeCategories, knowledgePages]);
 
-  const createBackup = (type: 'auto' | 'manual'): { success: boolean; filename: string; error?: string } => {
+  const createBackup = async (type: 'auto' | 'manual'): Promise<{ success: boolean; filename: string; error?: string }> => {
+    if (window.electronAPI) {
+      try {
+        addSystemLog(`[启动强制物理备份] 唤醒宿主硬件级安全隔离备份镜像...`);
+        const result = await window.electronAPI.createBackup(type);
+        if (result.success) {
+          addSystemLog(`[物理强设备份完成] 库镜像在本地用户 AppData 目录存储归档：${result.filename}`);
+          const refreshedBackups = await window.electronAPI.getBackups();
+          setBackups(refreshedBackups);
+        } else {
+          addSystemLog(`[物理级备份故障] 重写出错: ${result.error}`);
+        }
+        return result;
+      } catch (err: any) {
+        addSystemLog(`[备份异常拦截] ${err?.message || err}`);
+        return { success: false, filename: '', error: err?.message || String(err) };
+      }
+    }
+
     try {
       const todayStr = new Date().toISOString().split('T')[0];
       let filename = `backup_${todayStr}.db`;
@@ -430,8 +448,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const restoreBackup = async (filename: string): Promise<{ success: boolean; error?: string }> => {
     setIsDatabaseConnecting(true);
     addSystemLog(`[主库还原操作] 调度备份源 [${filename}] 载入还原会话...`);
-    addSystemLog(`[主库还原操作] 自动向主端发出会话销毁握手，正在关闭 SQLite data.db 管道连接...`);
     
+    if (window.electronAPI) {
+      addSystemLog(`[主库还原操作] 物理冷重置中... 正在覆盖本地 AppData 主数据库...`);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      try {
+        const res = await window.electronAPI.restoreBackup(filename);
+        if (!res.success) {
+          throw new Error(res.error || "物理覆盖还原出错");
+        }
+        
+        addSystemLog(`[数据重写] 主 SQLite 物理锁定卸载，覆盖本地 data.db 主库成功！`);
+        addSystemLog(`[内核重载] 重新挂载 SQLite 服务句柄，对前置项目组和合同包重构索引...`);
+        
+        // Reload all data from resurrected sqlite file
+        const loaded = await window.electronAPI.loadAllData();
+        if (loaded) {
+          if (loaded.projects) setProjects(loaded.projects);
+          if (loaded.contracts) setContracts(loaded.contracts);
+          if (loaded.preWorkflow) setPreWorkflow(loaded.preWorkflow);
+          if (loaded.postWorkflow) setPostWorkflow(loaded.postWorkflow);
+          if (loaded.bids) setBids(loaded.bids);
+          if (loaded.bidWorkflow) setBidWorkflow(loaded.bidWorkflow);
+          if (loaded.allTags) setAllTags(loaded.allTags);
+          if (loaded.knowledgeCategories) setKnowledgeCategories(loaded.knowledgeCategories);
+          if (loaded.knowledgePages) setKnowledgePages(loaded.knowledgePages);
+          if (loaded.backups) setBackups(loaded.backups);
+        }
+        
+        addSystemLog(`[重载就绪] 物理 SQLite 新连接重新建立，视图数据全极速刷新同步完成！`);
+        setIsDatabaseConnecting(false);
+        return { success: true };
+      } catch (err: any) {
+        addSystemLog(`[还原强制回滚] 物理还原遭遇致命阻隔: ${err?.message || err}`);
+        setIsDatabaseConnecting(false);
+        return { success: false, error: err?.message || String(err) };
+      }
+    }
+
+    addSystemLog(`[主库还原操作] 自动向主端发出会话销毁握手，正在关闭 SQLite data.db 管道连接...`);
     await new Promise(resolve => setTimeout(resolve, 700));
     
     try {
@@ -443,7 +498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addSystemLog(`[数据重写] 验证源备份包完整签名... 验证成功！`);
       await new Promise(resolve => setTimeout(resolve, 600));
       
-      const state = JSON.parse(backup.data);
+      const state = JSON.parse(backup.data || '{}');
       if (!state.projects || !state.contracts) {
         throw new Error("检测到该 .db 备份文件记录列损坏或表格列头不配对。安全中断写入。");
       }

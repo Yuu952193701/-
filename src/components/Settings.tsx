@@ -124,10 +124,10 @@ export const Settings: React.FC = () => {
     return `${(len / 1024 + 1.2).toFixed(1)} KB`;
   };
 
-  const handleManualBackup = () => {
-    const res = createBackup('manual');
+  const handleManualBackup = async () => {
+    const res = await createBackup('manual');
     if (res.success) {
-      alert(`🎉 备份成功！已在 [app/backup/] 文件夹归档: ${res.filename}`);
+      alert(`🎉 备份成功！已在备份文件夹归档: ${res.filename}`);
     } else {
       alert(`❌ 备份失败: ${res.error}`);
     }
