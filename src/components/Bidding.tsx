@@ -12,6 +12,7 @@ import {
 export const Bidding: React.FC = () => {
   const {
     bids,
+    contracts,
     bidWorkflow,
     addBid,
     updateBid,
@@ -28,6 +29,7 @@ export const Bidding: React.FC = () => {
 
   // Creation Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newBidId, setNewBidId] = useState('');
   const [newName, setNewName] = useState('');
   const [newShip, setNewShip] = useState('鸿鹄01');
   const [newTenderUnit, setNewTenderUnit] = useState('');
@@ -36,6 +38,7 @@ export const Bidding: React.FC = () => {
   const [newRemark, setNewRemark] = useState('');
   const [newTagsStr, setNewTagsStr] = useState('');
   const [newFolderPath, setNewFolderPath] = useState('');
+  const [newContractId, setNewContractId] = useState('');
 
   // Selected Item ID for details modal (direct inline editing)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -58,6 +61,14 @@ export const Bidding: React.FC = () => {
   // Handle bid creation
   const handleCreateBid = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newBidId.trim()) {
+      alert('请录入/填写标书编号！');
+      return;
+    }
+    if (bids.some(b => b.id.trim().toLowerCase() === newBidId.trim().toLowerCase())) {
+      alert('标书编号已存在，请核对并重新录入！');
+      return;
+    }
     if (!newName.trim()) {
       alert('请填写标书名称');
       return;
@@ -69,6 +80,7 @@ export const Bidding: React.FC = () => {
       .filter(t => t.length > 0);
 
     addBid({
+      id: newBidId.trim(),
       name: newName.trim(),
       ship: newShip,
       tenderUnit: newTenderUnit.trim() || undefined,
@@ -76,10 +88,12 @@ export const Bidding: React.FC = () => {
       dueDate: newDueDate || undefined,
       remark: newRemark.trim(),
       tags: tags,
-      folderPath: newFolderPath.trim() || undefined
+      folderPath: newFolderPath.trim() || undefined,
+      contractId: newContractId || undefined
     });
 
     // Reset fields
+    setNewBidId('');
     setNewName('');
     setNewShip('鸿鹄01');
     setNewTenderUnit('');
@@ -88,12 +102,13 @@ export const Bidding: React.FC = () => {
     setNewRemark('');
     setNewTagsStr('');
     setNewFolderPath('');
+    setNewContractId('');
     setShowCreateModal(false);
   };
 
   // Handle direct deletion
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`确认删除标书项目【${name}】及所有流转记录吗？不可撤销。`)) {
+    if (window.confirm(`确认删除标书项目【${name}】及对应所有流转记录吗？\n\n此操作仅在系统内删除该标书进度流转记录，不会删除您电脑本地的任何实际对应标书文件或工作文件夹。`)) {
       deleteBid(id);
       if (selectedItemId === id) setSelectedItemId(null);
     }
@@ -124,8 +139,8 @@ export const Bidding: React.FC = () => {
       bid.remark.toLowerCase().includes(searchLower) ||
       tagsMatch;
 
-    // 2. Ship filter
-    const shipMatch = selectedShip === 'all' || bid.ship === selectedShip;
+    // 2. Ship filter (allowing matching any ship in comma-separated strings for multiselect)
+    const shipMatch = selectedShip === 'all' || bid.ship.split(',').map(s => s.trim()).includes(selectedShip);
 
     // 3. Status filter
     const statusMatch = selectedStatus === 'all' || bid.status === selectedStatus;
@@ -137,6 +152,13 @@ export const Bidding: React.FC = () => {
     const urgentMatch = filterUrgent === 'all' || bid.isUrgent === filterUrgent;
 
     return termMatch && shipMatch && statusMatch && resultMatch && urgentMatch;
+  });
+
+  // Sort bids by latest updated/created time first
+  const sortedBids = [...filteredBids].sort((a, b) => {
+    const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return timeB - timeA;
   });
 
   return (
@@ -293,7 +315,7 @@ export const Bidding: React.FC = () => {
 
       {/* 4. Display list panel */}
       <div className="space-y-3">
-        {filteredBids.length === 0 ? (
+        {sortedBids.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-xl p-10 text-center shadow-3xs">
             <AlertTriangle className="mx-auto text-slate-300 mb-2.5" size={24} />
             <p className="text-xs text-slate-500 font-medium">满足设定过滤指标的标书很少或没有找到该数据件。</p>
@@ -311,7 +333,7 @@ export const Bidding: React.FC = () => {
             </button>
           </div>
         ) : (
-          filteredBids.map(bid => {
+          sortedBids.map(bid => {
             const statusColor = getBidStatusColor(bid.status);
             const overdue = bid.dueDate && isOverdue(bid.dueDate);
             const { hasPrev, hasNext } = canMove(bid);
@@ -494,10 +516,22 @@ export const Bidding: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateBid} className="p-6 space-y-4">
+            <form onSubmit={handleCreateBid} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               
-              {/* Field 1: Name and Ship selection */}
+              {/* Field 1: Name and ID selection */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">标书编号 / ID <span className="text-rose-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={newBidId}
+                    onChange={(e) => setNewBidId(e.target.value)}
+                    placeholder="如：BID2026-001"
+                    className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none font-mono"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">标书名称 <span className="text-rose-500">*</span></label>
                   <input
@@ -514,26 +548,54 @@ export const Bidding: React.FC = () => {
                     className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">所属船舶 <span className="text-rose-500">*</span></label>
-                  <select
-                    value={newShip}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewShip(val);
-                      setNewFolderPath(`D:\\采购\\标书\\${val}_${newName.trim() || '未完成'}`);
-                    }}
-                    className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-150 focus:outline-none"
-                  >
-                    {SHIPS.map(ship => (
-                      <option key={ship} value={ship}>{ship}</option>
-                    ))}
-                  </select>
+              {/* Field 2: Ship Multi-select checklist */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  所属船舶 <span className="text-[10px] text-blue-500 font-bold tracking-normal">(支持多选)</span> <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-2 p-2.5 border border-slate-200 bg-slate-50/70 rounded-md">
+                  {SHIPS.map(s => {
+                    const shipList = newShip.split(',').map(item => item.trim()).filter(Boolean);
+                    const isChecked = shipList.includes(s);
+                    return (
+                      <label 
+                        key={s} 
+                        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md border text-xs font-semibold transition-all cursor-pointer ${
+                          isChecked 
+                            ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-3xs' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            let newList: string[];
+                            if (isChecked) {
+                              newList = shipList.filter(item => item !== s);
+                            } else {
+                              newList = [...shipList, s];
+                            }
+                            if (newList.length === 0) {
+                              newList = ['鸿鹄01'];
+                            }
+                            const sortedList = SHIPS.filter(item => newList.includes(item));
+                            const finalString = sortedList.join(', ');
+                            setNewShip(finalString);
+                            setNewFolderPath(`D:\\采购\\标书\\${finalString}_${newName.trim() || '未完成'}`);
+                          }}
+                          className="h-3.5 w-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                        />
+                        <span>{s}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Field 2: Tendering Unit and Due Date */}
+              {/* Field 3: Tendering Unit and Due Date */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">招标单位 (可选)</label>
@@ -557,6 +619,30 @@ export const Bidding: React.FC = () => {
                 </div>
               </div>
 
+              {/* Link associated Contract */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">关联合同 (可选，关联拥有重叠船舶的合同)</label>
+                <select
+                  value={newContractId}
+                  onChange={(e) => setNewContractId(e.target.value)}
+                  className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs bg-white text-slate-700 outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">-- 不关联任何合同 --</option>
+                  {contracts
+                    .filter(c => {
+                      const selectedShipsList = newShip.split(',').map(s => s.trim()).filter(Boolean);
+                      const contractShips = c.ship.split(',').map(s => s.trim()).filter(Boolean);
+                      return contractShips.some(s => selectedShipsList.includes(s));
+                    })
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.ship} - {c.status})
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+
               {/* Folder Absolute Path */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">本地标书工作目录绝对路径</label>
@@ -565,13 +651,13 @@ export const Bidding: React.FC = () => {
                     type="text"
                     value={newFolderPath}
                     onChange={(e) => setNewFolderPath(e.target.value)}
-                    placeholder="如 D:\采购\标书\鸿鹄01_XX运维投标"
+                    placeholder="如 D:\采购\标书\德京108_XX运维投标"
                     className="flex-1 rounded-md border border-slate-200 px-3 py-1.8 text-xs font-mono focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none bg-slate-50"
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      alert('💡 系统已智能为您制定了契合该所属船舶和标书项目名的电脑文件夹存放路径，如需微调可直接在输入框中订正！');
+                      alert('💡 系统已智能为您制定了存放路径。选定多个所属船舶后，系统也会为您全自动拼贴多船标识路径！');
                     }}
                     className="px-2.5 py-1 text-slate-450 border border-slate-200 hover:bg-slate-50 text-[11px] rounded"
                   >

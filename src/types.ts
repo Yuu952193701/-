@@ -104,8 +104,23 @@ export interface BidProject {
   tags: string[]; // 自定义标签
   remark: string; // 备注
   folderPath: string; // 文件夹路径
+  contractId?: string; // 关联合同ID (Nullable)
   createdAt: string;
   updatedAt: string;
 }
 
+export interface ElectronAPI {
+  loadAllData: () => Promise<any>;
+  saveData: (key: string, value: any) => Promise<boolean>;
+  createBackup: (type: 'auto' | 'manual') => Promise<{ success: boolean; filename: string; error?: string }>;
+  restoreBackup: (filename: string) => Promise<{ success: boolean; error?: string }>;
+  deleteBackup: (filename: string) => Promise<boolean>;
+  getBackups: () => Promise<any[]>;
+  getAppPathInfo: () => Promise<{ dbPath: string; backupPath: string }>;
+}
 
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}

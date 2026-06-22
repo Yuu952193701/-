@@ -122,7 +122,7 @@ export const PostProcurement: React.FC = () => {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`确认删除后置合同【${name}】吗？这会自动断开与该合同绑定的需求项目的关联关系。`)) {
+    if (window.confirm(`确认删除后置合同【${name}】吗？\n\n此操作会自动断开与该合同绑定的需求项目的关联关系。此操作仅在系统内删除该合同履约流转记录，不会删除您电脑本地的任何实际对应文件或合同文件夹。`)) {
       deleteContract(id);
     }
   };
@@ -160,6 +160,13 @@ export const PostProcurement: React.FC = () => {
     const matchesUrgent = filterUrgent === 'all' || contract.isUrgent === filterUrgent;
 
     return matchesShipTab && matchesSearch && matchesStatus && matchesColor && matchesUrgent;
+  });
+
+  // Sort contracts by latest updated/created time first
+  const sortedContracts = [...filteredContracts].sort((a, b) => {
+    const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return timeB - timeA;
   });
 
   return (
@@ -295,17 +302,17 @@ export const PostProcurement: React.FC = () => {
       {/* Contracts Render list */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-          <span>列表匹配到的合同数: <span className="font-bold text-slate-700 font-mono">{filteredContracts.length}</span> 项</span>
+          <span>列表匹配到的合同数: <span className="font-bold text-slate-700 font-mono">{sortedContracts.length}</span> 项</span>
           <span>(点击任意合同行查看关联项目，支持一键下一步快捷操作)</span>
         </div>
 
-        {filteredContracts.length === 0 ? (
+        {sortedContracts.length === 0 ? (
           <div className="bg-white border border-slate-200/60 rounded-xl p-12 text-center text-slate-400 text-sm">
             没有查找到指定筛选条件下的后置合同项目。可在上面切换其他所属船舶，或新增合同。
           </div>
         ) : (
           <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
-            {filteredContracts.map(contract => {
+            {sortedContracts.map(contract => {
               const statusColor = getContractStatusColor(contract.status);
               const overdue = contract.dueDate && isOverdue(contract.dueDate);
               const { hasPrev, hasNext } = canMove(contract);

@@ -8,9 +8,10 @@ interface ItemDetailsModalProps {
   itemId: string;
   type: 'project' | 'contract' | 'bid';
   onClose: () => void;
+  onItemIdChange?: (newId: string) => void;
 }
 
-export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type, onClose }) => {
+export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type, onClose, onItemIdChange }) => {
   const {
     projects,
     contracts,
@@ -64,19 +65,22 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
   const [resultStatus, setResultStatus] = useState<'进行中' | '已中标' | '未中标' | '已终止'>(
     bidItem?.resultStatus || '进行中'
   );
+  const [bidNo, setBidNo] = useState(bidItem?.id || '');
 
   // Search state for projects in contract view
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
 
-  // Specific to Project
+  // Specific to Project & Bid linkage
   const [associatedContractId, setAssociatedContractId] = useState<string>('');
 
   useEffect(() => {
     if (projectItem) {
       setAssociatedContractId(projectItem.contractId || '');
+    } else if (bidItem) {
+      setAssociatedContractId(bidItem.contractId || '');
     }
-  }, [projectItem]);
+  }, [projectItem, bidItem]);
 
   useEffect(() => {
     if (currentItem) {
@@ -98,6 +102,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
       if (type === 'bid' && bidItem) {
         setTenderUnit(bidItem.tenderUnit || '');
         setResultStatus(bidItem.resultStatus || '进行中');
+        setBidNo(bidItem.id);
       }
     }
   }, [itemId, type, currentItem]);
@@ -115,6 +120,9 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
       updateContract(itemId, fields);
     } else if (type === 'bid') {
       updateBid(itemId, fields);
+      if (fields.id && onItemIdChange) {
+        onItemIdChange(fields.id);
+      }
     }
   };
 
@@ -144,10 +152,14 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
 
   const activeSteps = type === 'project' ? preWorkflow : type === 'contract' ? postWorkflow : bidWorkflow;
 
-  // Filter existing contracts that contain the selected project's ship
-  const eligibleContracts = contracts.filter(c => c.ship.split(',').map(s => s.trim()).includes(ship));
-  // Find contract associated with this project
-  const connectedContract = projectItem?.contractId ? contracts.find(c => c.id === projectItem.contractId) : undefined;
+  // Filter existing contracts that contain the selected project/bid's ship (allowing overlapping ships for multiselect)
+  const currentShipsList = ship.split(',').map(s => s.trim()).filter(Boolean);
+  const eligibleContracts = contracts.filter(c => {
+    const contractShips = c.ship.split(',').map(s => s.trim()).filter(Boolean);
+    return contractShips.some(s => currentShipsList.includes(s));
+  });
+  // Find contract associated with this project or bid
+  const connectedContract = (projectItem?.contractId || bidItem?.contractId) ? contracts.find(c => c.id === (projectItem?.contractId || bidItem?.contractId)) : undefined;
 
   // Find projects associated with this contract
   const connectedProjects = contractItem ? projects.filter(p => p.contractId === contractItem.id) : [];
@@ -170,7 +182,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
               {type === 'project' ? '需求项目详情' : type === 'contract' ? '合同详情' : '标书详情'}
             </span>
             <span className="font-mono text-sm text-slate-400 font-medium">
-              ID: {type === 'bid' ? currentItem.id.substring(0, 8) : (code || currentItem.id.substring(0, 8))}
+              ID: {type === 'bid' ? currentItem.id : (code || currentItem.id.substring(0, 8))}
             </span>
           </div>
           <button 
@@ -240,20 +252,44 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
             
             {/* Project/Contract Code / Bid Tender Unit */}
             {type === 'bid' ? (
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
-                  招标单位 / 建设业主
-                </label>
-                <input
-                  type="text"
-                  value={tenderUnit}
-                  onChange={(e) => {
-                    setTenderUnit(e.target.value);
-                    handleSaveField({ tenderUnit: e.target.value });
-                  }}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
-                  placeholder="请输入招标单位..."
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-1 md:col-span-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                    标书ID / 编号 <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bidNo}
+                    onChange={(e) => {
+                      const newId = e.target.value.trim();
+                      setBidNo(newId);
+                      if (newId && newId !== itemId) {
+                        const exists = bids.some(b => b.id === newId);
+                        if (!exists) {
+                          handleSaveField({ id: newId });
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-none font-mono"
+                    placeholder="请输入标书编号..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 font-bold">
+                    招标单位 / 建设业主
+                  </label>
+                  <input
+                    type="text"
+                    value={tenderUnit}
+                    onChange={(e) => {
+                      setTenderUnit(e.target.value);
+                      handleSaveField({ tenderUnit: e.target.value });
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
+                    placeholder="请输入招标单位..."
+                  />
+                </div>
               </div>
             ) : (
               <div>
@@ -274,13 +310,13 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
             )}
 
             {/* Ship Selector */}
-            <div className={type === 'contract' ? "col-span-1 md:col-span-2" : ""}>
+            <div className={(type === 'contract' || type === 'bid') ? "col-span-1 md:col-span-2" : ""}>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center justify-between">
                 <span>所属船舶</span>
-                {type === 'contract' && <span className="text-[10px] text-blue-500 font-bold tracking-normal">(多选)</span>}
+                {(type === 'contract' || type === 'bid') && <span className="text-[10px] text-blue-500 font-bold tracking-normal">(多选)</span>}
               </label>
-              {type === 'contract' ? (
-                <div id="ship-checklist-container" className="flex flex-wrap gap-2 p-2 border border-slate-200 bg-slate-55/40 bg-slate-50/70 rounded-lg">
+              {(type === 'contract' || type === 'bid') ? (
+                <div id="ship-checklist-container" className="flex flex-wrap gap-2 p-2 border border-slate-200 bg-slate-50/70 rounded-lg">
                   {SHIPS.map(s => {
                     const isChecked = ship.split(',').map(item => item.trim()).includes(s);
                     return (
@@ -755,6 +791,45 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                       const newId = e.target.value || undefined;
                       setAssociatedContractId(newId || '');
                       associateProjectToContract(itemId, newId);
+                    }}
+                    className="w-full p-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-100 focus:outline-none bg-white font-medium"
+                  >
+                    <option value="">-- 未关联任何合同 --</option>
+                    {eligibleContracts.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.status})
+                      </option>
+                    ))}
+                  </select>
+                  {connectedContract && (
+                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-xs space-y-1">
+                      <div className="font-medium text-slate-700 flex items-center justify-between">
+                        <span>关联详情：{connectedContract.name}</span>
+                        <span className="text-blue-600 font-semibold">{connectedContract.status}</span>
+                      </div>
+                      <p className="text-slate-400 font-mono">文件夹: {connectedContract.folderPath || '未设置'}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : type === 'bid' ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+                已关联合同 (关联属于相同船舶的合同)
+              </label>
+              {eligibleContracts.length === 0 ? (
+                <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                  当前船舶 <span className="font-bold">{ship}</span> 尚未创建任何对应的合同。请先去后置工作模块创建一个属于 {ship} 的合同。
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <select
+                    value={associatedContractId}
+                    onChange={(e) => {
+                      const newId = e.target.value || undefined;
+                      setAssociatedContractId(newId || '');
+                      handleSaveField({ contractId: newId });
                     }}
                     className="w-full p-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-100 focus:outline-none bg-white font-medium"
                   >

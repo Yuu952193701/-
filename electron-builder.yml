@@ -1,0 +1,31 @@
+appId: "com.procurement.workbench"
+productName: "采购进度桌面管理系统"
+copyright: "Copyright © 2026 Procurement Desktop"
+directories:
+  output: "dist_electron"
+  buildResources: "assets"
+
+files:
+  - "dist/**/*"
+  - "electron/**/*"
+  - "package.json"
+
+win:
+  target:
+    - target: "nsis"
+      arch:
+        - "x64"
+    - target: "portable"
+      arch:
+        - "x64"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "采购进度桌面工作台"
+  uninstallDisplayName: "卸载采购进度桌面管理系统"
+
+portable:
+  artifactName: "采购进度桌面工作台_Portable.${ext}"

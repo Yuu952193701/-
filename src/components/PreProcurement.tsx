@@ -98,8 +98,15 @@ export const PreProcurement: React.FC = () => {
     return matchesSearch && matchesShip && matchesStatus && matchesColor && matchesUrgent;
   });
 
+  // Sort by latest updated/created time first
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return timeB - timeA;
+  });
+
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`确认删除需求项目【${name}】吗？不可撤销。`)) {
+    if (window.confirm(`确认删除需求项目【${name}】吗？\n\n此操作仅在系统内删除该项目进度流转记录，不会删除您电脑本地的任何实际对应文件或工作文件夹。`)) {
       deleteProject(id);
     }
   };
@@ -218,17 +225,17 @@ export const PreProcurement: React.FC = () => {
       {/* Main projects lists */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-          <span>符合上述过滤条件的前置需求数: <span className="font-bold text-slate-700 font-mono">{filteredProjects.length}</span> 项</span>
+          <span>符合上述过滤条件的前置需求数: <span className="font-bold text-slate-700 font-mono">{sortedProjects.length}</span> 项</span>
           <span>(点击任意项目行可一键进行信息维护与合同绑定)</span>
         </div>
 
-        {filteredProjects.length === 0 ? (
+        {sortedProjects.length === 0 ? (
           <div className="bg-white border border-slate-200/60 rounded-xl p-12 text-center text-slate-400 text-sm">
             没有找到能对应过滤规则的需求项目。可以尝试更换关键词或在右上角点击“新建需求”。
           </div>
         ) : (
           <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
-            {filteredProjects.map(project => {
+            {sortedProjects.map(project => {
               const statusColor = getProjectStatusColor(project.status);
               const overdue = project.dueDate && isOverdue(project.dueDate);
               const { hasPrev, hasNext } = canMove(project);

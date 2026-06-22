@@ -211,74 +211,120 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteBackup = (filename: string) => {
+    if (window.electronAPI) {
+      window.electronAPI.deleteBackup(filename).then(success => {
+        if (success) {
+          setBackups(prev => prev.filter(b => b.filename !== filename));
+          addSystemLog(`[备份库容优化] 已从用户目录清理物理备份: ${filename}`);
+        } else {
+          addSystemLog(`[备份库容优化] 清理物理备份失败: ${filename}`);
+        }
+      }).catch(err => {
+        addSystemLog(`[备份清理异常] ${err?.message || err}`);
+      });
+      return;
+    }
     setBackups(prev => {
       const filtered = prev.filter(b => b.filename !== filename);
       localStorage.setItem('p_workbench_all_backups', JSON.stringify(filtered));
-      addSystemLog(`[备份库容优化] 已清理物理备份文件: app/backup/${filename}`);
+      addSystemLog(`[备份库容优化] 已清理仿真物理备份文件: app/backup/${filename}`);
       return filtered;
     });
   };
 
   // 1. Startup Directory & File Check, and Daily Auto Backup
   useEffect(() => {
-    addSystemLog("采购进度桌面管理系统 Electron 内核加载完毕！");
-    addSystemLog("进程挂载环境：C:\\采购管理系统\\app.exe - 启动中...");
-    
-    // Check and create local simulated directories
-    const hasDbDir = localStorage.getItem('p_workbench_db_dir_ready');
-    if (!hasDbDir) {
-      localStorage.setItem('p_workbench_db_dir_ready', 'true');
-      addSystemLog("环境检查: 未检测到主数据目录 [app/database/]，已成功创设！");
-      addSystemLog("环境检查: 未检测到备份仓库 [app/backup/]，已成功创设！");
-      addSystemLog("环境检查: 主数据库文书 [app/database/data.db] 初始化导入成功。");
-    } else {
-      addSystemLog("环境检查: 目标本地数据存放空间 [app/database/data.db] 热就绪。");
-      addSystemLog("环境检查: 备用仓库映射地址 [app/backup/] 初始化扫描通过。");
-    }
-    addSystemLog("主库服务: 连接主本地 SQLite (v3.35.0) data.db 成功稳定启动。");
-    
-    // Auto-backup once-per-day restriction
-    const todayStr = new Date().toISOString().split('T')[0];
-    const savedBackupsRaw = localStorage.getItem('p_workbench_all_backups');
-    const existingBackups: BackupFile[] = savedBackupsRaw ? JSON.parse(savedBackupsRaw) : [];
-    
-    const hasTodayAutoBackup = existingBackups.some(b => b.formattedDate === todayStr && b.type === 'auto');
-    if (!hasTodayAutoBackup) {
-      addSystemLog(`[启动例会自动备份] 开始为今日时间戳 (${todayStr}) 创建默认保障拷贝...`);
-      const stateObj = {
-        projects,
-        contracts,
-        preWorkflow,
-        postWorkflow,
-        bids,
-        bidWorkflow,
-        allTags,
-        knowledgeCategories,
-        knowledgePages,
-        version: '1.2'
-      };
-      const serializedData = JSON.stringify(stateObj);
-      const filename = `backup_${todayStr}.db`;
-      const newBackup: BackupFile = {
-        filename,
-        timestamp: new Date().toISOString(),
-        formattedDate: todayStr,
-        type: 'auto',
-        size: `${(serializedData.length / 1024 + 1.2).toFixed(1)} KB`,
-        data: serializedData
-      };
-      
-      let updated = [newBackup, ...existingBackups];
-      if (updated.length > 30) {
-        addSystemLog(`[库容自动维护] 物理备份超过 30 份限制额度，已删除最早归档备份：${updated[updated.length - 1].filename}`);
-        updated = updated.slice(0, 30);
+    const initData = async () => {
+      if (window.electronAPI) {
+        addSystemLog("检测到 Electron 宿主环境！正在对齐拉取本地 SQLite 主数据库...");
+        try {
+          setIsDatabaseConnecting(true);
+          const pathInfo = await window.electronAPI.getAppPathInfo();
+          addSystemLog(`[主库位置] ${pathInfo.dbPath}`);
+          addSystemLog(`[备份位置] ${pathInfo.backupPath}`);
+          
+          const loaded = await window.electronAPI.loadAllData();
+          if (loaded) {
+            if (loaded.projects) setProjects(loaded.projects);
+            if (loaded.contracts) setContracts(loaded.contracts);
+            if (loaded.preWorkflow) setPreWorkflow(loaded.preWorkflow);
+            if (loaded.postWorkflow) setPostWorkflow(loaded.postWorkflow);
+            if (loaded.bids) setBids(loaded.bids);
+            if (loaded.bidWorkflow) setBidWorkflow(loaded.bidWorkflow);
+            if (loaded.allTags) setAllTags(loaded.allTags);
+            if (loaded.knowledgeCategories) setKnowledgeCategories(loaded.knowledgeCategories);
+            if (loaded.knowledgePages) setKnowledgePages(loaded.knowledgePages);
+            if (loaded.backups) setBackups(loaded.backups);
+            
+            addSystemLog("物理 SQLite 数据库成功挂载！全部本地工作流水已同步至视图。");
+          }
+        } catch (err: any) {
+          addSystemLog(`[SQLite 载入异常] ${err?.message || err}`);
+        } finally {
+          setIsDatabaseConnecting(false);
+        }
+      } else {
+        addSystemLog("采购进度桌面管理系统 Electron 仿真内核加载完毕！");
+        addSystemLog("进程挂载环境：C:\\采购管理系统\\app.exe - 启动中...");
+        
+        // Check and create local simulated directories
+        const hasDbDir = localStorage.getItem('p_workbench_db_dir_ready');
+        if (!hasDbDir) {
+          localStorage.setItem('p_workbench_db_dir_ready', 'true');
+          addSystemLog("环境检查: 未检测到主数据目录 [app/database/]，已成功创设！");
+          addSystemLog("环境检查: 未检测到备份仓库 [app/backup/]，已成功创设！");
+          addSystemLog("环境检查: 主数据库文书 [app/database/data.db] 初始化导入成功。");
+        } else {
+          addSystemLog("环境检查: 目标本地数据存放空间 [app/database/data.db] 热就绪。");
+          addSystemLog("环境检查: 备用仓库映射地址 [app/backup/] 初始化扫描通过。");
+        }
+        addSystemLog("主库服务: 连接主本地 SQLite (v3.35.0) data.db 成功稳定启动。");
+        
+        // Auto-backup once-per-day restriction
+        const todayStr = new Date().toISOString().split('T')[0];
+        const savedBackupsRaw = localStorage.getItem('p_workbench_all_backups');
+        const existingBackups: BackupFile[] = savedBackupsRaw ? JSON.parse(savedBackupsRaw) : [];
+        
+        const hasTodayAutoBackup = existingBackups.some(b => b.formattedDate === todayStr && b.type === 'auto');
+        if (!hasTodayAutoBackup) {
+          addSystemLog(`[启动例会自动备份] 开始为今日时间戳 (${todayStr}) 创建默认保障拷贝...`);
+          const stateObj = {
+            projects,
+            contracts,
+            preWorkflow,
+            postWorkflow,
+            bids,
+            bidWorkflow,
+            allTags,
+            knowledgeCategories,
+            knowledgePages,
+            version: '1.2'
+          };
+          const serializedData = JSON.stringify(stateObj);
+          const filename = `backup_${todayStr}.db`;
+          const newBackup: BackupFile = {
+            filename,
+            timestamp: new Date().toISOString(),
+            formattedDate: todayStr,
+            type: 'auto',
+            size: `${(serializedData.length / 1024 + 1.2).toFixed(1)} KB`,
+            data: serializedData
+          };
+          
+          let updated = [newBackup, ...existingBackups];
+          if (updated.length > 30) {
+            addSystemLog(`[库容自动维护] 物理备份超过 30 份限制额度，已删除最早归档备份：${updated[updated.length - 1].filename}`);
+            updated = updated.slice(0, 30);
+          }
+          localStorage.setItem('p_workbench_all_backups', JSON.stringify(updated));
+          setBackups(updated);
+          addSystemLog(`[例会备份就绪] 备份文件已封存至主目录: app/backup/${filename}`);
+        } else {
+          addSystemLog(`[例会备份就绪] 本日自动备份档 [backup_${todayStr}.db] 表现完备，防止生成重复赘沉数据。`);
+        }
       }
-      localStorage.setItem('p_workbench_all_backups', JSON.stringify(updated));
-      setBackups(updated);
-      addSystemLog(`[例会备份就绪] 备份文件已封存至主目录: app/backup/${filename}`);
-    } else {
-      addSystemLog(`[例会备份就绪] 本日自动备份档 [backup_${todayStr}.db] 表现完备，防止生成重复赘沉数据。`);
-    }
+    };
+    initData();
   }, []);
 
   // 2. Closure auto backup listener (whenever user exits app session)
@@ -519,41 +565,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Persist transitions
+  // Persist transitions (dual synchronization)
   useEffect(() => {
     localStorage.setItem('p_workbench_projects', JSON.stringify(projects));
+    if (window.electronAPI) window.electronAPI.saveData('projects', projects).catch(err => console.error(err));
   }, [projects]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_contracts', JSON.stringify(contracts));
+    if (window.electronAPI) window.electronAPI.saveData('contracts', contracts).catch(err => console.error(err));
   }, [contracts]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_pre_wf', JSON.stringify(preWorkflow));
+    if (window.electronAPI) window.electronAPI.saveData('preWorkflow', preWorkflow).catch(err => console.error(err));
   }, [preWorkflow]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_post_wf', JSON.stringify(postWorkflow));
+    if (window.electronAPI) window.electronAPI.saveData('postWorkflow', postWorkflow).catch(err => console.error(err));
   }, [postWorkflow]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_bids', JSON.stringify(bids));
+    if (window.electronAPI) window.electronAPI.saveData('bids', bids).catch(err => console.error(err));
   }, [bids]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_bid_wf', JSON.stringify(bidWorkflow));
+    if (window.electronAPI) window.electronAPI.saveData('bidWorkflow', bidWorkflow).catch(err => console.error(err));
   }, [bidWorkflow]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_all_tags', JSON.stringify(allTags));
+    if (window.electronAPI) window.electronAPI.saveData('allTags', allTags).catch(err => console.error(err));
   }, [allTags]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_k_categories', JSON.stringify(knowledgeCategories));
+    if (window.electronAPI) window.electronAPI.saveData('knowledgeCategories', knowledgeCategories).catch(err => console.error(err));
   }, [knowledgeCategories]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_k_pages', JSON.stringify(knowledgePages));
+    if (window.electronAPI) window.electronAPI.saveData('knowledgePages', knowledgePages).catch(err => console.error(err));
   }, [knowledgePages]);
 
   const addGlobalTag = (tag: string) => {
@@ -673,7 +728,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanName = bidData.name.trim();
     
     const newBid: BidProject = {
-      id: `bid-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: bidData.id || `bid-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       name: cleanName,
       ship: bidData.ship,
       tenderUnit: bidData.tenderUnit?.trim(),
@@ -684,6 +739,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       tags: bidData.tags ?? [],
       remark: bidData.remark ?? '',
       folderPath: bidData.folderPath || `D:\\采购\\标书\\${bidData.ship}_${cleanName}`,
+      contractId: bidData.contractId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
