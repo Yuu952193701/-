@@ -17,7 +17,9 @@ export const Bidding: React.FC = () => {
     addBid,
     updateBid,
     deleteBid,
-    moveBidStep
+    moveBidStep,
+    recommendedTags,
+    addGlobalTag
   } = useAppState();
 
   // Search and Filter States
@@ -36,8 +38,9 @@ export const Bidding: React.FC = () => {
   const [newIsUrgent, setNewIsUrgent] = useState(false);
   const [newDueDate, setNewDueDate] = useState('');
   const [newRemark, setNewRemark] = useState('');
-  const [newTagsStr, setNewTagsStr] = useState('');
-  const [newFolderPath, setNewFolderPath] = useState('');
+  const [newBidTags, setNewBidTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [showTagOptions, setShowTagOptions] = useState(false);
   const [newContractId, setNewContractId] = useState('');
 
   // Selected Item ID for details modal (direct inline editing)
@@ -58,6 +61,20 @@ export const Bidding: React.FC = () => {
     };
   };
 
+  const handleAddBidTag = (tagText: string) => {
+    const trimmed = tagText.trim();
+    if (trimmed && !newBidTags.includes(trimmed)) {
+      setNewBidTags(prev => [...prev, trimmed]);
+      addGlobalTag(trimmed);
+    }
+    setNewTagInput('');
+    setShowTagOptions(false);
+  };
+
+  const handleRemoveBidTag = (tagToRemove: string) => {
+    setNewBidTags(prev => prev.filter(t => t !== tagToRemove));
+  };
+
   // Handle bid creation
   const handleCreateBid = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,11 +91,6 @@ export const Bidding: React.FC = () => {
       return;
     }
 
-    const tags = newTagsStr
-      .split(/[,，\s]+/)
-      .map(t => t.trim())
-      .filter(t => t.length > 0);
-
     addBid({
       id: newBidId.trim(),
       name: newName.trim(),
@@ -87,8 +99,7 @@ export const Bidding: React.FC = () => {
       isUrgent: newIsUrgent,
       dueDate: newDueDate || undefined,
       remark: newRemark.trim(),
-      tags: tags,
-      folderPath: newFolderPath.trim() || undefined,
+      tags: newBidTags,
       contractId: newContractId || undefined
     });
 
@@ -100,8 +111,9 @@ export const Bidding: React.FC = () => {
     setNewIsUrgent(false);
     setNewDueDate('');
     setNewRemark('');
-    setNewTagsStr('');
-    setNewFolderPath('');
+    setNewBidTags([]);
+    setNewTagInput('');
+    setShowTagOptions(false);
     setNewContractId('');
     setShowCreateModal(false);
   };
@@ -111,14 +123,6 @@ export const Bidding: React.FC = () => {
     if (window.confirm(`确认删除标书项目【${name}】及对应所有流转记录吗？\n\n此操作仅在系统内删除该标书进度流转记录，不会删除您电脑本地的任何实际对应标书文件或工作文件夹。`)) {
       deleteBid(id);
       if (selectedItemId === id) setSelectedItemId(null);
-    }
-  };
-
-  // Handle Open local folder simulation
-  const handleOpenFolder = (path: string) => {
-    alert(`📂 正在调起资源管理器：\n绝对路径: ${path || 'D:\\采购\\标书\\'}\n\n已为您自动复制本地存放绝对路径，可在文件夹窗口中直接按 Ctrl+V 前往。`);
-    if (path) {
-      navigator.clipboard.writeText(path);
     }
   };
 
@@ -177,7 +181,6 @@ export const Bidding: React.FC = () => {
         
         <button
           onClick={() => {
-            setNewFolderPath(`D:\\采购\\标书\\鸿鹄01_未命名标书`);
             setShowCreateModal(true);
           }}
           className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-all shadow-3xs cursor-pointer self-start md:self-center"
@@ -465,15 +468,6 @@ export const Bidding: React.FC = () => {
                       <ArrowRight size={13} />
                     </button>
 
-                    {/* Open folder simulators */}
-                    <button
-                      onClick={() => handleOpenFolder(bid.folderPath)}
-                      className="p-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-blue-600 hover:border-slate-300 hover:text-blue-800 transition-all shadow-3xs cursor-pointer"
-                      title="极速呼出本地对应标书归档文件夹"
-                    >
-                      <FolderOpen size={13} />
-                    </button>
-
                     {/* Quick Edit */}
                     <button
                       onClick={() => setSelectedItemId(bid.id)}
@@ -539,10 +533,7 @@ export const Bidding: React.FC = () => {
                     required
                     value={newName}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setNewName(val);
-                      // Update folder auto default path
-                      setNewFolderPath(`D:\\采购\\标书\\${newShip}_${val.trim() || '未完成'}`);
+                      setNewName(e.target.value);
                     }}
                     placeholder="如：XX海域电缆备件采购投标"
                     className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
@@ -584,7 +575,6 @@ export const Bidding: React.FC = () => {
                             const sortedList = SHIPS.filter(item => newList.includes(item));
                             const finalString = sortedList.join(', ');
                             setNewShip(finalString);
-                            setNewFolderPath(`D:\\采购\\标书\\${finalString}_${newName.trim() || '未完成'}`);
                           }}
                           className="h-3.5 w-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
                         />
@@ -619,63 +609,69 @@ export const Bidding: React.FC = () => {
                 </div>
               </div>
 
-              {/* Link associated Contract */}
+              {/*              {/* Field 3: Tags list */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">关联合同 (可选，关联拥有重叠船舶的合同)</label>
-                <select
-                  value={newContractId}
-                  onChange={(e) => setNewContractId(e.target.value)}
-                  className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs bg-white text-slate-700 outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="">-- 不关联任何合同 --</option>
-                  {contracts
-                    .filter(c => {
-                      const selectedShipsList = newShip.split(',').map(s => s.trim()).filter(Boolean);
-                      const contractShips = c.ship.split(',').map(s => s.trim()).filter(Boolean);
-                      return contractShips.some(s => selectedShipsList.includes(s));
-                    })
-                    .map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.ship} - {c.status})
-                      </option>
-                    ))
-                  }
-                </select>
-              </div>
+                <label className="block text-xs font-bold text-slate-550 text-slate-500 uppercase tracking-wider mb-1.5">自定义识别标签 (回车快速创建)</label>
+                <div className="relative">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-lg min-h-[38px] items-center mb-1.5 focus-within:bg-white focus-within:border-blue-500 transition-all">
+                    {newBidTags.map(tag => (
+                      <span key={tag} className="inline-flex items-center bg-blue-50 hover:bg-blue-150 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px] transition-colors border border-blue-100/60 font-sans">
+                        <span>{tag}</span>
+                        <button type="button" onClick={() => handleRemoveBidTag(tag)} className="ml-1 hover:text-red-500 font-bold font-mono text-[10px] cursor-pointer">&times;</button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      value={newTagInput}
+                      onChange={(e) => {
+                        setNewTagInput(e.target.value);
+                        setShowTagOptions(true);
+                      }}
+                      onFocus={() => setShowTagOptions(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newTagInput.trim()) {
+                            handleAddBidTag(newTagInput.trim());
+                          }
+                        }
+                      }}
+                      placeholder={newBidTags.length === 0 ? "回车确认生成当前标签..." : "+ 添加..."}
+                      className="flex-1 bg-transparent border-none text-xs focus:outline-none min-w-[120px]"
+                    />
+                  </div>
 
-              {/* Folder Absolute Path */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">本地标书工作目录绝对路径</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newFolderPath}
-                    onChange={(e) => setNewFolderPath(e.target.value)}
-                    placeholder="如 D:\采购\标书\德京108_XX运维投标"
-                    className="flex-1 rounded-md border border-slate-200 px-3 py-1.8 text-xs font-mono focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none bg-slate-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      alert('💡 系统已智能为您制定了存放路径。选定多个所属船舶后，系统也会为您全自动拼贴多船标识路径！');
-                    }}
-                    className="px-2.5 py-1 text-slate-450 border border-slate-200 hover:bg-slate-50 text-[11px] rounded"
-                  >
-                    提示
-                  </button>
+                  {/* Autocomplete recommendation dropdown */}
+                  {showTagOptions && recommendedTags.length > 0 && (
+                    <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl z-50 text-xs py-1">
+                      <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold text-[9px] uppercase tracking-wider">系统推荐候选标签</div>
+                      {recommendedTags
+                        .map(rt => rt.name)
+                        .filter(t => !newBidTags.includes(t) && t.toLowerCase().includes(newTagInput.toLowerCase()))
+                        .map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => handleAddBidTag(t)}
+                            className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                          >
+                            <span>#{t}</span>
+                            <span className="text-[9px] text-blue-500 bg-blue-50 px-1 py-0.2 rounded font-sans font-bold">选择</span>
+                          </button>
+                        ))}
+                      <div className="p-1.5 text-center border-t border-slate-100 mt-1 flex justify-between px-2 shrink-0">
+                        <span className="text-[9px] text-slate-400 mt-0.5">支持回车生成任何标签</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowTagOptions(false)}
+                          className="text-[10px] text-blue-500 hover:text-blue-700 font-bold cursor-pointer"
+                        >
+                          收起
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              {/* Field 3: Tags list */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">快捷识别标签 (英文/中文逗号分隔多个)</label>
-                <input
-                  type="text"
-                  value={newTagsStr}
-                  onChange={(e) => setNewTagsStr(e.target.value)}
-                  placeholder="如：运维, 现货, 工期紧张"
-                  className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
-                />
               </div>
 
               {/* Is Urgent field */}

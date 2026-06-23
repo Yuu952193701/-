@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { DemandProject, Contract, WorkflowStep, SHIPS, BackupFile, KnowledgeCategory, KnowledgePage, BidProject } from '../types';
+import { DemandProject, Contract, WorkflowStep, SHIPS, BackupFile, KnowledgeCategory, KnowledgePage, BidProject, ChecklistTask, RecommendedTag } from '../types';
 import {
   DEFAULT_PRE_STEPS,
   DEFAULT_POST_STEPS,
@@ -22,11 +22,11 @@ interface AppContextProps {
   // Knowledge Library
   knowledgeCategories: KnowledgeCategory[];
   knowledgePages: KnowledgePage[];
-  addKnowledgeCategory: (name: string, parentId?: string | null) => void;
+  addKnowledgeCategory: (name: string, parentId?: string | null) => KnowledgeCategory | undefined;
   renameKnowledgeCategory: (id: string, name: string) => void;
   deleteKnowledgeCategory: (id: string) => void;
   moveKnowledgeCategory: (id: string, newParentId: string | null) => void;
-  addKnowledgePage: (page: Partial<KnowledgePage> & { title: string; categoryId: string | null }) => void;
+  addKnowledgePage: (page: Partial<KnowledgePage> & { title: string; categoryId: string | null }) => KnowledgePage;
   updateKnowledgePage: (id: string, updates: Partial<KnowledgePage>) => void;
   deleteKnowledgePage: (id: string) => void;
   moveKnowledgePage: (id: string, targetCategoryId: string | null) => void;
@@ -61,6 +61,26 @@ interface AppContextProps {
   // Global Tags catalog for autocomplete suggestion
   allTags: string[];
   addGlobalTag: (tag: string) => void;
+
+  // Checklist Actions
+  checklistTasks: ChecklistTask[];
+  addChecklistTask: (title: string, notes?: string, dueDate?: string, isUrgent?: boolean) => void;
+  updateChecklistTask: (id: string, updates: Partial<ChecklistTask>) => void;
+  deleteChecklistTask: (id: string) => void;
+  reorderChecklistTasks: (tasks: ChecklistTask[]) => void;
+
+  // Recommended Tags Actions
+  recommendedTags: RecommendedTag[];
+  addRecommendedTag: (name: string) => void;
+  updateRecommendedTag: (id: string, name: string) => void;
+  deleteRecommendedTag: (id: string) => void;
+  reorderRecommendedTags: (tags: RecommendedTag[]) => void;
+
+  // Global Navigation Helper State
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  selectedKnowledgePageId: string | null;
+  setSelectedKnowledgePageId: (id: string | null) => void;
 
   // Database Backup / Restore Actions
   backups: BackupFile[];
@@ -197,6 +217,111 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('p_workbench_all_backups');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Recommended Tags State
+  const [recommendedTags, setRecommendedTags] = useState<RecommendedTag[]>(() => {
+    const saved = localStorage.getItem('p_workbench_recommended_tags');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: 'rec-1', name: '国能', order: 1 },
+      { id: 'rec-2', name: '华电', order: 2 },
+      { id: 'rec-3', name: '紧急', order: 3 },
+      { id: 'rec-4', name: '大宗采购', order: 4 },
+      { id: 'rec-5', name: '日常备件', order: 5 },
+    ];
+  });
+
+  // Checklist Tasks State
+  const [checklistTasks, setChecklistTasks] = useState<ChecklistTask[]>(() => {
+    const saved = localStorage.getItem('p_workbench_checklist_tasks');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Global Navigation & Page Selection States
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [selectedKnowledgePageId, setSelectedKnowledgePageId] = useState<string | null>(null);
+
+  // Sync recommendedTags
+  useEffect(() => {
+    localStorage.setItem('p_workbench_recommended_tags', JSON.stringify(recommendedTags));
+    if (window.electronAPI) {
+      window.electronAPI.saveData('recommendedTags', recommendedTags).catch(err => console.error(err));
+    }
+  }, [recommendedTags]);
+
+  // Sync checklistTasks
+  useEffect(() => {
+    localStorage.setItem('p_workbench_checklist_tasks', JSON.stringify(checklistTasks));
+    if (window.electronAPI) {
+      window.electronAPI.saveData('checklistTasks', checklistTasks).catch(err => console.error(err));
+    }
+  }, [checklistTasks]);
+
+  const addChecklistTask = (title: string, notes?: string, dueDate?: string, isUrgent?: boolean) => {
+    const newTask: ChecklistTask = {
+      id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      title: title.trim(),
+      completed: false,
+      notes: notes || '',
+      dueDate: dueDate || '',
+      isUrgent: isUrgent || false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    setChecklistTasks(prev => [newTask, ...prev]);
+  };
+
+  const updateChecklistTask = (id: string, updates: Partial<ChecklistTask>) => {
+    setChecklistTasks(prev => prev.map(t => {
+      if (t.id === id) {
+        return {
+          ...t,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return t;
+    }));
+  };
+
+  const deleteChecklistTask = (id: string) => {
+    setChecklistTasks(prev => prev.filter(t => t.id !== id));
+  };
+
+  const reorderChecklistTasks = (tasks: ChecklistTask[]) => {
+    setChecklistTasks(tasks);
+  };
+
+  const addRecommendedTag = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (recommendedTags.some(t => t.name === trimmed)) {
+      alert('推荐标签已存在');
+      return;
+    }
+    const maxOrder = recommendedTags.reduce((max, t) => t.order > max ? t.order : max, 0);
+    const newTag: RecommendedTag = {
+      id: `rec-${Date.now()}`,
+      name: trimmed,
+      order: maxOrder + 1
+    };
+    setRecommendedTags(prev => [...prev, newTag]);
+  };
+
+  const updateRecommendedTag = (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setRecommendedTags(prev => prev.map(t => t.id === id ? { ...t, name: trimmed } : t));
+  };
+
+  const deleteRecommendedTag = (id: string) => {
+    setRecommendedTags(prev => prev.filter(t => t.id !== id));
+  };
+
+  const reorderRecommendedTags = (tags: RecommendedTag[]) => {
+    const mapped = tags.map((t, idx) => ({ ...t, order: idx + 1 }));
+    setRecommendedTags(mapped);
+  };
 
   const [isDatabaseConnecting, setIsDatabaseConnecting] = useState<boolean>(false);
   const [systemLogs, setSystemLogs] = useState<string[]>([]);
@@ -684,6 +809,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setKnowledgeCategories(prev => [...prev, newCat]);
     addSystemLog(`[资料库] 新增目录分类: ${cleanName}`);
+    return newCat;
   };
 
   const renameKnowledgeCategory = (id: string, name: string) => {
@@ -747,6 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setKnowledgePages(prev => [newPage, ...prev]);
     newPage.tags.forEach(addGlobalTag);
     addSystemLog(`[资料库] 增设新页面: ${cleanTitle}`);
+    return newPage;
   };
 
   const updateKnowledgePage = (id: string, updates: Partial<KnowledgePage>) => {
@@ -944,7 +1071,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       code: cleanCode,
       name: cleanName,
       ship: contractData.ship,
-      status: defaultStatus,
+      status: contractData.status || defaultStatus,
       isUrgent: contractData.isUrgent ?? false,
       dueDate: contractData.dueDate,
       tags: contractData.tags ?? [],
@@ -1129,6 +1256,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateBidWorkflow,
         allTags,
         addGlobalTag,
+        checklistTasks,
+        addChecklistTask,
+        updateChecklistTask,
+        deleteChecklistTask,
+        reorderChecklistTasks,
+        recommendedTags,
+        addRecommendedTag,
+        updateRecommendedTag,
+        deleteRecommendedTag,
+        reorderRecommendedTags,
+        activeTab,
+        setActiveTab,
+        selectedKnowledgePageId,
+        setSelectedKnowledgePageId,
         backups,
         createBackup,
         restoreBackup,

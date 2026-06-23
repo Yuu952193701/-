@@ -3,7 +3,7 @@ import { useAppState } from '../context/AppContext';
 import { Contract, SHIPS } from '../types';
 import { ItemDetailsModal } from './ItemDetailsModal';
 import { isOverdue, formatChineseDate } from '../data';
-import { Search, Plus, ArrowLeft, ArrowRight, Trash2, Edit2, FileText, CheckCircle, Clock, Link, AlertTriangle, Layers, X, FolderMinus } from 'lucide-react';
+import { Search, Plus, ArrowLeft, ArrowRight, Trash2, Edit2, FileText, CheckCircle, Clock, Link, AlertTriangle, Layers, X, FolderMinus, Tag } from 'lucide-react';
 
 export const PostProcurement: React.FC = () => {
   const {
@@ -14,7 +14,9 @@ export const PostProcurement: React.FC = () => {
     updateContract,
     deleteContract,
     moveContractStep,
-    batchAssociateProjects
+    batchAssociateProjects,
+    recommendedTags,
+    addGlobalTag
   } = useAppState();
 
   // Search & Filter States
@@ -33,7 +35,10 @@ export const PostProcurement: React.FC = () => {
   const [newContractShip, setNewContractShip] = useState('鸿鹄01');
   const [newContractCode, setNewContractCode] = useState('');
   const [newContractDueDate, setNewContractDueDate] = useState('');
-  const [newContractTagsText, setNewContractTagsText] = useState('');
+  const [newContractStatus, setNewContractStatus] = useState('');
+  const [newContractTags, setNewContractTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [showTagOptions, setShowTagOptions] = useState(false);
   const [newContractBriefRemark, setNewContractBriefRemark] = useState('');
   const [selectedProjectIdsToLink, setSelectedProjectIdsToLink] = useState<string[]>([]);
 
@@ -72,6 +77,20 @@ export const PostProcurement: React.FC = () => {
     setSelectedProjectIdsToLink([]); // reset checked associations
   };
 
+  const handleAddContractTag = (tagText: string) => {
+    const trimmed = tagText.trim();
+    if (trimmed && !newContractTags.includes(trimmed)) {
+      setNewContractTags(prev => [...prev, trimmed]);
+      addGlobalTag(trimmed);
+    }
+    setNewTagInput('');
+    setShowTagOptions(false);
+  };
+
+  const handleRemoveContractTag = (tagToRemove: string) => {
+    setNewContractTags(prev => prev.filter(t => t !== tagToRemove));
+  };
+
   const handleCreateContract = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContractName.trim()) {
@@ -79,14 +98,6 @@ export const PostProcurement: React.FC = () => {
       return;
     }
 
-    const tagsArray = newContractTagsText
-      .split(/[,，]/)
-      .map(t => t.trim())
-      .filter(t => t !== '');
-
-    // 1. Compute dynamic id or unique node
-    // Auto-generate folder path mimicking PRD style: D:\采购\<Ship>\<Name>
-    const generatedFolderPath = `D:\\采购\\${newContractShip}\\${newContractName.trim()}`;
     const cleanCode = newContractCode.trim() || newContractName.trim();
 
     addContract({
@@ -94,9 +105,9 @@ export const PostProcurement: React.FC = () => {
       code: cleanCode,
       ship: newContractShip,
       dueDate: newContractDueDate || undefined,
-      tags: tagsArray,
+      status: newContractStatus || undefined,
+      tags: newContractTags,
       remark: newContractBriefRemark.trim(),
-      folderPath: generatedFolderPath,
     });
 
     // Since addContract writes asynchronously, let's wait next tick or simply bind projects to newly created contract.
@@ -115,7 +126,10 @@ export const PostProcurement: React.FC = () => {
     setNewContractName('');
     setNewContractCode('');
     setNewContractDueDate('');
-    setNewContractTagsText('');
+    setNewContractStatus('');
+    setNewContractTags([]);
+    setNewTagInput('');
+    setShowTagOptions(false);
     setNewContractBriefRemark('');
     setSelectedProjectIdsToLink([]);
     setShowCreateModal(false);
@@ -743,16 +757,85 @@ export const PostProcurement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                  自定义标签 (英文逗号逗开可输入多个)
+                <label className="block text-[10px] font-bold text-slate-440 text-slate-400 uppercase tracking-widest mb-1">
+                  选择合同状态 (默认为流转第一步)
                 </label>
-                <input
-                  type="text"
-                  value={newContractTagsText}
-                  onChange={(e) => setNewContractTagsText(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
-                  placeholder="例如: 宝钢集团, ￥56000, 紧锁件"
-                />
+                <select
+                  value={newContractStatus}
+                  onChange={(e) => setNewContractStatus(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none bg-white font-semibold text-slate-700 cursor-pointer"
+                >
+                  <option value="">-- 系统默认第一阶段 ({postWorkflow[0]?.name || '合同签订'}) --</option>
+                  {postWorkflow.map(step => (
+                    <option key={step.name} value={step.name}>{step.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                  自定义标签 (回车快速创建)
+                </label>
+                <div className="relative">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-lg min-h-[38px] items-center mb-1.5 focus-within:bg-white focus-within:border-blue-500 transition-all">
+                    {newContractTags.map(tag => (
+                      <span key={tag} className="inline-flex items-center bg-blue-50 hover:bg-blue-150 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px] transition-colors border border-blue-100/60 font-sans">
+                        <span>{tag}</span>
+                        <button type="button" onClick={() => handleRemoveContractTag(tag)} className="ml-1 hover:text-red-500 font-bold font-mono text-[10px] cursor-pointer">&times;</button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      value={newTagInput}
+                      onChange={(e) => {
+                        setNewTagInput(e.target.value);
+                        setShowTagOptions(true);
+                      }}
+                      onFocus={() => setShowTagOptions(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newTagInput.trim()) {
+                            handleAddContractTag(newTagInput.trim());
+                          }
+                        }
+                      }}
+                      placeholder={newContractTags.length === 0 ? "回车确认生成当前标签..." : "+ 添加..."}
+                      className="flex-1 bg-transparent border-none text-xs focus:outline-none min-w-[120px]"
+                    />
+                  </div>
+
+                  {/* Autocomplete recommendation dropdown */}
+                  {showTagOptions && recommendedTags.length > 0 && (
+                    <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl z-50 text-xs py-1">
+                      <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold text-[9px] uppercase tracking-wider">推荐标签</div>
+                      {recommendedTags
+                        .map(rt => rt.name)
+                        .filter(t => !newContractTags.includes(t) && t.toLowerCase().includes(newTagInput.toLowerCase()))
+                        .map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => handleAddContractTag(t)}
+                            className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                          >
+                            <span>#{t}</span>
+                            <span className="text-[9px] text-blue-500 bg-blue-50 px-1 py-0.2 rounded font-sans font-bold">选择</span>
+                          </button>
+                        ))}
+                      <div className="p-1.5 text-center border-t border-slate-100 mt-1 flex justify-between px-2 shrink-0">
+                        <span className="text-[9px] text-slate-400 mt-0.5">支持回车生成任意标签</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowTagOptions(false)}
+                          className="text-[10px] text-blue-500 hover:text-blue-700 font-bold cursor-pointer"
+                        >
+                          收起
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -763,18 +846,9 @@ export const PostProcurement: React.FC = () => {
                   rows={2}
                   value={newContractBriefRemark}
                   onChange={(e) => setNewContractBriefRemark(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none font-sans"
+                  className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-105 focus:border-blue-500 focus:outline-none font-sans"
                   placeholder="填写合同供货方名称、货款结算条件或其它相关说明..."
                 />
-              </div>
-
-              <div className="bg-slate-50 border border-slate-100 p-2.5 rounded-md text-[11px] text-slate-400 leading-relaxed font-sans flex-shrink-0">
-                <strong>💡 本地路径自动规划：</strong>
-                <p className="mt-1">
-                  合同成立后默认状态为<b>【{postWorkflow[0]?.name || '合同签订'}】</b>。
-                  同时为你规划本地存放文件夹为：<br />
-                  <span className="font-mono text-blue-600 font-semibold text-[10px]">D:\采购\{newContractShip}\{newContractName.trim() || '合同名称'}</span>
-                </p>
               </div>
 
               {/* Action Buttons */}

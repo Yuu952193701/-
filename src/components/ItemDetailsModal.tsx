@@ -27,7 +27,6 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
     associateProjectToContract
   } = useAppState();
 
-  const [copied, setCopied] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [showTagOptions, setShowTagOptions] = useState(false);
 
@@ -45,9 +44,10 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
   const [status, setStatus] = useState(currentItem?.status || '');
   const [isUrgent, setIsUrgent] = useState(currentItem?.isUrgent || false);
   const [dueDate, setDueDate] = useState(currentItem?.dueDate || '');
-  const [folderPath, setFolderPath] = useState(currentItem?.folderPath || '');
   const [remark, setRemark] = useState(currentItem?.remark || '');
   const [tags, setTags] = useState<string[]>(currentItem?.tags || []);
+  const [folderPath, setFolderPath] = useState(currentItem?.folderPath || '');
+  const [copied, setCopied] = useState(false);
   
   // Specific to Contract
   const [contractStatus, setContractStatus] = useState<'执行中' | '已完成' | '已终止'>(
@@ -90,9 +90,9 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
       setStatus(currentItem.status || '');
       setIsUrgent(currentItem.isUrgent || false);
       setDueDate(currentItem.dueDate || '');
-      setFolderPath(currentItem.folderPath || '');
       setRemark(currentItem.remark || '');
       setTags(currentItem.tags || []);
+      setFolderPath(currentItem.folderPath || '');
       
       if (type === 'contract' && contractItem) {
         setContractStatus(contractItem.contractStatus || '执行中');
@@ -127,9 +127,11 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
   };
 
   const handleCopyFolder = () => {
-    navigator.clipboard.writeText(folderPath);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (folderPath) {
+      navigator.clipboard.writeText(folderPath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleAddTag = (tagText: string) => {
@@ -872,7 +874,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                             <span>{p.name}</span>
                           </div>
                           <p className="text-slate-400 text-[10px] mt-1 font-mono">
-                            船号: {p.ship} | 文件夹: {p.folderPath || '无'}
+                            船号: {p.ship}
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -959,7 +961,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                                 <span className="truncate max-w-[280px]">{p.name}</span>
                               </div>
                               <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                                船号: {p.ship} | 文件夹: {p.folderPath || '无'}
+                                船号: {p.ship}
                               </div>
                             </div>
                             <div className="flex items-center space-x-1.5">

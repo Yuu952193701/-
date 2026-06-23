@@ -106,7 +106,7 @@ export const PreProcurement: React.FC = () => {
   });
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`确认删除需求项目【${name}】吗？\n\n此操作仅在系统内删除该项目进度流转记录，不会删除您电脑本地的任何实际对应文件或工作文件夹。`)) {
+    if (window.confirm(`确认删除需求项目【${name}】吗？\n\n此操作仅在系统内删除该项目进度流转记录，不会删除您的任何实际数据。`)) {
       deleteProject(id);
     }
   };
@@ -460,8 +460,7 @@ export const PreProcurement: React.FC = () => {
               <div className="bg-slate-50 border border-slate-150 p-2.5 rounded-md text-[11px] text-slate-400 leading-relaxed font-sans mt-2">
                 <strong>💡 智能默认配置：</strong>
                 <p className="mt-1">
-                  该前置项目创建后，自动处于<b>【{preWorkflow[0]?.name || '需求单'}】</b>阶段。
-                  同时为你本地建立了文件夹路径：<span className="font-mono">D:\采购\前置工作\{newProjectCode || '编号'}{newProjectName || '名称'}</span>，其余属性后续皆可自由更改。
+                  该前置项目创建后，自动处于<b>【{preWorkflow[0]?.name || '需求单'}】</b>阶段。您后续可进入项目详情添加标签、绑定合同或编辑备注信息。
                 </p>
               </div>
 

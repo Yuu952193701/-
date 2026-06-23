@@ -109,6 +109,23 @@ export interface BidProject {
   updatedAt: string;
 }
 
+export interface ChecklistTask {
+  id: string;
+  title: string;
+  completed: boolean;
+  notes?: string;
+  dueDate?: string;
+  isUrgent?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecommendedTag {
+  id: string;
+  name: string;
+  order: number;
+}
+
 export interface ElectronAPI {
   loadAllData: () => Promise<any>;
   saveData: (key: string, value: any) => Promise<boolean>;

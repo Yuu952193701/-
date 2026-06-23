@@ -112,38 +112,58 @@ export const KnowledgeLibrary: React.FC = () => {
     setIsEditingPage(false);
   };
 
+  // Helper to expand all parent folders of a category
+  const expandParentCategories = (catId: string) => {
+    const toExpand: { [key: string]: boolean } = {};
+    let currentId: string | null = catId;
+    while (currentId) {
+      const cat = knowledgeCategories.find(c => c.id === currentId);
+      if (cat) {
+        toExpand[cat.id] = false; // false means NOT collapsed (i.e. expanded)
+        currentId = cat.parentId;
+      } else {
+        break;
+      }
+    }
+    setCollapsedCategories(prev => ({
+      ...prev,
+      ...toExpand
+    }));
+  };
+
   // Launch pre-filled Page creation
   const handleCreateNewPage = (categoryId: string | null = null) => {
     const parentFolder = knowledgeCategories.find(c => c.id === categoryId);
     const titlePlaceholder = `${parentFolder ? parentFolder.name + '的' : ''}新页面`;
     
-    // Auto-create dummy page structure and select it, then trigger edit mode
-    const tempId = `temp-kp-${Date.now()}`;
-    addKnowledgePage({
+    // Auto-create page structure and select/edit it immediately
+    const newPage = addKnowledgePage({
       title: titlePlaceholder,
       categoryId: categoryId,
       content: `# ${titlePlaceholder}\n\n在这里写下新知识与备注...\n`,
       tags: categoryId === 'cat-1' ? ['供应商'] : categoryId === 'cat-2' ? ['付款'] : []
     });
 
-    // Run safe timeout to select the newly created page (which will appear first)
-    setTimeout(() => {
-      setSelectedPageId(prev => {
-        const firstPage = knowledgePages[0];
-        if (firstPage) {
-          handleStartEdit(firstPage);
-          return firstPage.id;
-        }
-        return prev;
-      });
-    }, 100);
+    if (newPage) {
+      setSelectedPageId(newPage.id);
+      handleStartEdit(newPage);
+      if (categoryId) {
+        expandParentCategories(categoryId);
+      }
+    }
   };
 
   // Action helpers for categories
   const handleAddCategorySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
-    addKnowledgeCategory(newCategoryName, newCategoryParentId);
+    const newCat = addKnowledgeCategory(newCategoryName, newCategoryParentId);
+    if (newCat) {
+      setSelectedCategoryId(newCat.id);
+      if (newCat.parentId) {
+        expandParentCategories(newCat.parentId);
+      }
+    }
     setIsAddingCategory(false);
     setNewCategoryName('');
     setNewCategoryParentId(null);
@@ -364,6 +384,27 @@ export const KnowledgeLibrary: React.FC = () => {
     return knowledgeCategories.filter(c => c.parentId === parentId);
   };
 
+  // Generate a flat list of nested options with labels showing indentation for select picker
+  const getCategoryOptions = () => {
+    const list: { id: string; name: string; indentedName: string }[] = [];
+    
+    const recurse = (parentId: string | null, depth: number) => {
+      const children = knowledgeCategories.filter(c => c.parentId === parentId);
+      children.forEach(c => {
+        const prefix = '\u00A0\u00A0'.repeat(depth) + (depth > 0 ? '└─ ' : '');
+        list.push({
+          id: c.id,
+          name: c.name,
+          indentedName: `${prefix}📁 ${c.name}`
+        });
+        recurse(c.id, depth + 1);
+      });
+    };
+    
+    recurse(null, 0);
+    return list;
+  };
+
   // Search filter
   const filteredPages = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -419,7 +460,7 @@ export const KnowledgeLibrary: React.FC = () => {
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-2 text-[10px] text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-2 text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 ✕
               </button>
@@ -433,144 +474,237 @@ export const KnowledgeLibrary: React.FC = () => {
           <div className="flex items-center space-x-1">
             <button
               onClick={() => {
-                setNewCategoryParentId(null);
+                // Default to selected folder if any, otherwise null
+                setNewCategoryParentId(selectedCategoryId);
                 setIsAddingCategory(true);
               }}
-              title="新建根分类"
-              className="hover:text-blue-600 bg-white hover:bg-slate-200/50 px-1.5 py-0.5 rounded border border-slate-200 transition-colors cursor-pointer text-[9px] font-bold"
+              title="新建目录分类"
+              className="hover:text-blue-600 bg-white hover:bg-slate-200/50 px-1.5 py-0.5 rounded border border-slate-200 transition-colors cursor-pointer text-[9px] font-bold flex items-center space-x-0.5"
             >
-              + 加分类
+              <span>+ 加分类</span>
             </button>
           </div>
         </div>
 
         {/* Category adding block inline */}
         {isAddingCategory && (
-          <form onSubmit={handleAddCategorySubmit} className="p-2 border-b border-slate-200 bg-white shadow-inner flex flex-col space-y-1.5">
-            <div className="text-[9px] font-bold text-slate-400 uppercase">
-              {newCategoryParentId ? `新建 [${knowledgeCategories.find(c => c.id === newCategoryParentId)?.name}] 的子分类:` : '新建顶级分类目录:'}
+          <form onSubmit={handleAddCategorySubmit} className="p-3 border-b border-slate-200 bg-slate-50/50 shadow-inner flex flex-col space-y-2">
+            <div className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
+              <span>📂 新建目录分类</span>
+              <button 
+                type="button" 
+                onClick={() => setIsAddingCategory(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={12} />
+              </button>
             </div>
-            <div className="flex space-x-1 pl-0.5">
+            
+            <div className="space-y-1">
+              <label className="block text-[9px] font-bold text-slate-400 uppercase">分类名称</label>
               <input
                 type="text"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 placeholder="名称, 如: 对账合同等"
-                className="flex-1 border border-slate-300 rounded text-xs px-1.5 py-0.5 focus:outline-none focus:border-blue-500"
+                className="w-full bg-white border border-slate-300 rounded text-xs px-2 py-1 focus:outline-none focus:border-blue-500 font-sans"
                 autoFocus
+                required
               />
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded px-1 text-[10px] transition-colors"><Check size={12} /></button>
-              <button type="button" onClick={() => setIsAddingCategory(false)} className="bg-slate-200 hover:bg-slate-300 rounded px-1 text-[10px] text-slate-600 transition-colors"><X size={12} /></button>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="block text-[9px] font-bold text-slate-400 uppercase">层级归属 (所属父分类)</label>
+              <select
+                value={newCategoryParentId || ''}
+                onChange={(e) => setNewCategoryParentId(e.target.value || null)}
+                className="w-full bg-white border border-slate-300 rounded text-xs px-1.5 py-1 focus:outline-none focus:border-blue-500 font-sans"
+              >
+                <option value="">📁 [根目录] 作为一级分类</option>
+                {getCategoryOptions().map(opt => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.indentedName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex justify-end space-x-1.5 pt-1">
+              <button 
+                type="button" 
+                onClick={() => setIsAddingCategory(false)} 
+                className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-[10px] rounded px-2.5 py-1 cursor-pointer transition-colors"
+              >
+                取消
+              </button>
+              <button 
+                type="submit" 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded px-3 py-1 cursor-pointer transition-colors flex items-center space-x-1"
+              >
+                <Check size={11} />
+                <span>创建分类</span>
+              </button>
             </div>
           </form>
         )}
 
-        {/* Scrollable Categories List */}
+        {/* Scrollable Categories & Files Explorer Tree */}
         <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-          
-          {/* Loose/View All category buttons */}
-          <button
-            onClick={() => setSelectedCategoryId(null)}
-            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-semibold text-left transition-colors text-slate-700 hover:bg-slate-200/40 cursor-pointer ${selectedCategoryId === null ? 'bg-white border border-slate-200/80 shadow-3xs text-blue-600' : ''}`}
-          >
-            <div className="flex items-center space-x-1.5">
-              <BookOpen size={12} className={selectedCategoryId === null ? 'text-blue-600' : 'text-slate-400'} />
-              <span>📚 全部门类 (不设限)</span>
+          {searchQuery.trim() ? (
+            // Search Active Mode: Flat List of matching pages
+            <div className="space-y-1">
+              <div className="p-1 px-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                <span>🔍 全文搜索结果 ({filteredPages.length} 篇)</span>
+              </div>
+              <div className="space-y-0.5">
+                {filteredPages.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400 text-[11px]">
+                    <SearchX size={15} className="mx-auto text-slate-300 mb-1" />
+                    <span>无相应搜索结果</span>
+                  </div>
+                ) : (
+                  filteredPages.map(page => {
+                    const isSelected = selectedPageId === page.id;
+                    const hasAssoc = page.associatedContractId || page.associatedProjectId || page.associatedSupplierName;
+                    
+                    return (
+                      <button
+                        key={page.id}
+                        onClick={() => {
+                          setSelectedPageId(page.id);
+                          setIsEditingPage(false);
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded text-[11px] font-medium transition-colors text-left cursor-pointer ${
+                          isSelected 
+                            ? 'bg-blue-600 text-white font-semibold' 
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5 truncate max-w-[85%]">
+                          <FileText size={11} className={isSelected ? 'text-white' : 'text-slate-400'} />
+                          <span className="truncate">{page.title}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {hasAssoc && (
+                            <div className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-blue-200' : 'bg-blue-500/80 animate-pulse'}`} />
+                          )}
+                          <span className={`text-[9px] font-mono ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                            {page.tags.length > 0 && `[${page.tags[0]}]`}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
-            <span className="bg-slate-200/70 text-slate-500 font-mono text-[9px] px-1.5 py-0.2 rounded font-bold">{knowledgePages.length}</span>
-          </button>
-
-          <div className="h-px bg-slate-200/50 my-1"></div>
-
-          {/* Render category list tree recursively with nice nested indentation style */}
-          {knowledgeCategories.length === 0 ? (
-            <div className="text-center py-4 text-slate-400 text-[11px] font-medium">无自定义分类</div>
           ) : (
-            <div className="space-y-0.5">
-              {buildTree(null).map(topCat => (
-                <CategoryNode 
-                  key={topCat.id} 
-                  node={topCat} 
-                  depth={0} 
-                  selectedCategoryId={selectedCategoryId}
-                  setSelectedCategoryId={setSelectedCategoryId}
-                  collapsedCategories={collapsedCategories}
-                  toggleCategoryCollapse={toggleCategoryCollapse}
-                  editingCategoryId={editingCategoryId}
-                  setEditingCategoryId={setEditingCategoryId}
-                  editingCategoryName={editingCategoryName}
-                  setEditingCategoryName={setEditingCategoryName}
-                  handleRenameCategorySubmit={handleRenameCategorySubmit}
-                  deleteKnowledgeCategory={deleteKnowledgeCategory}
-                  subCategoryIds={getSubCategoryIds(topCat.id)}
-                  knowledgeCategories={knowledgeCategories}
-                  moveKnowledgeCategory={moveKnowledgeCategory}
-                  relocatingCategoryId={relocatingCategoryId}
-                  setRelocatingCategoryId={setRelocatingCategoryId}
-                  pages={knowledgePages}
-                  handleCreateNewPage={handleCreateNewPage}
-                  setIsAddingCategory={setIsAddingCategory}
-                  setNewCategoryParentId={setNewCategoryParentId}
-                />
-              ))}
+            // Default Mode: Windows Explorer Integrated Tree Layout
+            <div className="space-y-1">
+              {/* Loose/View All category buttons */}
+              <button
+                onClick={() => setSelectedCategoryId(null)}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-semibold text-left transition-colors text-slate-700 hover:bg-slate-200/40 cursor-pointer ${selectedCategoryId === null ? 'bg-white border border-slate-200/80 shadow-3xs text-blue-600' : ''}`}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <BookOpen size={12} className={selectedCategoryId === null ? 'text-blue-600' : 'text-slate-400'} />
+                  <span>📚 全部门类 (不设限)</span>
+                </div>
+                <span className="bg-slate-200/70 text-slate-500 font-mono text-[9px] px-1.5 py-0.2 rounded font-bold">{knowledgePages.length}</span>
+              </button>
+
+              <div className="h-px bg-slate-200/50 my-1"></div>
+
+              {/* Render category list tree recursively with nice nested indentation style */}
+              <div className="space-y-0.5">
+                {/* A. Top-level categories */}
+                {buildTree(null).map(topCat => (
+                  <CategoryNode 
+                    key={topCat.id} 
+                    node={topCat} 
+                    depth={0} 
+                    selectedCategoryId={selectedCategoryId}
+                    setSelectedCategoryId={setSelectedCategoryId}
+                    collapsedCategories={collapsedCategories}
+                    toggleCategoryCollapse={toggleCategoryCollapse}
+                    editingCategoryId={editingCategoryId}
+                    setEditingCategoryId={setEditingCategoryId}
+                    editingCategoryName={editingCategoryName}
+                    setEditingCategoryName={setEditingCategoryName}
+                    handleRenameCategorySubmit={handleRenameCategorySubmit}
+                    deleteKnowledgeCategory={deleteKnowledgeCategory}
+                    subCategoryIds={getSubCategoryIds(topCat.id)}
+                    getSubCategoryIds={getSubCategoryIds}
+                    knowledgeCategories={knowledgeCategories}
+                    moveKnowledgeCategory={moveKnowledgeCategory}
+                    relocatingCategoryId={relocatingCategoryId}
+                    setRelocatingCategoryId={setRelocatingCategoryId}
+                    pages={knowledgePages}
+                    handleCreateNewPage={handleCreateNewPage}
+                    setIsAddingCategory={setIsAddingCategory}
+                    setNewCategoryParentId={setNewCategoryParentId}
+                    selectedPageId={selectedPageId}
+                    setSelectedPageId={setSelectedPageId}
+                    setIsEditingPage={setIsEditingPage}
+                    deleteKnowledgePage={deleteKnowledgePage}
+                  />
+                ))}
+
+                {/* B. Top-level (root classified) files/pages */}
+                {knowledgePages.filter(p => !p.categoryId).map(page => {
+                  const isPageSelected = selectedPageId === page.id;
+                  const hasAssoc = page.associatedContractId || page.associatedProjectId || page.associatedSupplierName;
+                  return (
+                    <div
+                      key={page.id}
+                      style={{ paddingLeft: '22px' }}
+                      className={`group flex items-center justify-between rounded px-1.5 py-1 text-[11px] transition-colors cursor-pointer ${
+                        isPageSelected
+                          ? 'bg-blue-600 text-white font-semibold'
+                          : 'text-slate-600 hover:bg-slate-200/50'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedPageId(page.id);
+                        setIsEditingPage(false);
+                      }}
+                    >
+                      <div className="flex items-center space-x-1.5 truncate max-w-[80%]">
+                        <FileText size={10} className={isPageSelected ? 'text-white' : 'text-slate-400'} />
+                        <span className="truncate">{page.title}</span>
+                      </div>
+                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {hasAssoc && (
+                          <div className={`h-1.5 w-1.5 rounded-full ${isPageSelected ? 'bg-blue-200' : 'bg-blue-500/80 animate-pulse'}`} />
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('确定要删除本篇资料吗？此操作无法撤销。')) {
+                              deleteKnowledgePage(page.id);
+                              if (selectedPageId === page.id) {
+                                setSelectedPageId(null);
+                              }
+                            }
+                          }}
+                          title="安全丢弃"
+                          className={`p-0.5 rounded ${isPageSelected ? 'hover:bg-blue-700 text-blue-100' : 'hover:bg-slate-200 text-slate-400 hover:text-red-650'}`}
+                        >
+                          <Trash2 size={9} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {knowledgeCategories.length === 0 && knowledgePages.length === 0 && (
+                  <div className="text-center py-8 text-slate-400 text-[11px]">
+                    无自定义分类与资料页面
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </div>
-
-        {/* 2-1B Split Page selection list under search / category */}
-        <div className="h-96 border-t border-slate-200 bg-white flex flex-col flex-shrink-0">
-          <div className="p-1 px-3 bg-slate-50 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-            <span>
-              {selectedCategoryId 
-                ? `分类下资料 (${filteredPages.length} 篇)` 
-                : searchQuery 
-                ? `全文搜索结果 (${filteredPages.length} 篇)` 
-                : `所有知识目录 (${filteredPages.length} 篇)`
-              }
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
-            {filteredPages.length === 0 ? (
-              <div className="text-center py-6 text-slate-400 text-[11px]">
-                <SearchX size={15} className="mx-auto text-slate-300 mb-1" />
-                <span>无相应资料页面</span>
-              </div>
-            ) : (
-              filteredPages.map(page => {
-                const isSelected = selectedPageId === page.id;
-                const hasAssoc = page.associatedContractId || page.associatedProjectId || page.associatedSupplierName;
-                
-                return (
-                  <button
-                    key={page.id}
-                    onClick={() => {
-                      setSelectedPageId(page.id);
-                      setIsEditingPage(false); // Reset edit context
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded text-[11px] font-medium transition-colors text-left cursor-pointer ${
-                      isSelected 
-                        ? 'bg-blue-600 text-white font-semibold' 
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-1.5 truncate max-w-[85%]">
-                      <FileText size={11} className={isSelected ? 'text-white' : 'text-slate-400'} />
-                      <span className="truncate">{page.title}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      {hasAssoc && (
-                        <div className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-blue-200' : 'bg-blue-500/80 animate-pulse'}`} title="含业务档案关联" />
-                      )}
-                      <span className={`text-[9px] font-mono ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                        {page.tags.length > 0 && `[${page.tags[0]}]`}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
         </div>
 
       </div>
@@ -1009,7 +1143,7 @@ export const KnowledgeLibrary: React.FC = () => {
                 新建第一篇资料
               </button>
               <button
-                onClick={() => addKnowledgeCategory('供应商', null)}
+                onClick={() => addKnowledgeCategory('新分类', null)}
                 className="bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-semibold rounded px-3.5 py-1.5 cursor-pointer transition-colors"
               >
                 初始化分类
@@ -1048,6 +1182,12 @@ interface CategoryNodeProps {
   handleCreateNewPage: (catId: string) => void;
   setIsAddingCategory: (add: boolean) => void;
   setNewCategoryParentId: (id: string | null) => void;
+  
+  // Handlers for nested page selection & deletion
+  selectedPageId: string | null;
+  setSelectedPageId: (id: string | null) => void;
+  setIsEditingPage: (editing: boolean) => void;
+  deleteKnowledgePage: (id: string) => void;
 }
 
 const CategoryNode: React.FC<CategoryNodeProps> = ({
@@ -1072,22 +1212,30 @@ const CategoryNode: React.FC<CategoryNodeProps> = ({
   pages,
   handleCreateNewPage,
   setIsAddingCategory,
-  setNewCategoryParentId
+  setNewCategoryParentId,
+  selectedPageId,
+  setSelectedPageId,
+  setIsEditingPage,
+  deleteKnowledgePage
 }) => {
   const isSelected = selectedCategoryId === node.id;
   const isCollapsed = !!collapsedCategories[node.id];
   const isEditing = editingCategoryId === node.id;
   const isMoving = relocatingCategoryId === node.id;
 
-  // Find sub-nodes
+  // Find sub-nodes (folders) and files (pages) inside this folder
   const subNodes = knowledgeCategories.filter(c => c.parentId === node.id);
-  const nodePagesCount = pages.filter(p => p.categoryId === node.id).length;
+  const nodePages = pages.filter(p => p.categoryId === node.id);
+  const nodePagesCount = nodePages.length;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleRenameCategorySubmit(node.id);
     }
   };
+
+  // True if this folder contains either subfolders OR files
+  const hasChildren = subNodes.length > 0 || nodePagesCount > 0;
 
   return (
     <div className="space-y-0.5">
@@ -1110,7 +1258,7 @@ const CategoryNode: React.FC<CategoryNodeProps> = ({
             }}
             className="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
           >
-            {subNodes.length > 0 ? (
+            {hasChildren ? (
               isCollapsed ? <ChevronRight size={11} /> : <ChevronDown size={11} />
             ) : (
               <span className="w-2.5 h-2.5 block" />
@@ -1148,7 +1296,7 @@ const CategoryNode: React.FC<CategoryNodeProps> = ({
          </div>
 
          {/* Action icons displayed on hover */}
-         <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+         <div className="flex items-center space-x-1 opacity-35 md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all duration-200">
           
           {/* Create page directly in this folder */}
           <button
@@ -1207,7 +1355,7 @@ const CategoryNode: React.FC<CategoryNodeProps> = ({
           >
             <Trash2 size={10} />
           </button>
-        </div>
+         </div>
 
       </div>
 
@@ -1243,9 +1391,10 @@ const CategoryNode: React.FC<CategoryNodeProps> = ({
         </div>
       )}
 
-      {/* Sub nodes rendering list */}
-      {subNodes.length > 0 && !isCollapsed && (
+      {/* Expanded directory tree content: folders first, files second */}
+      {!isCollapsed && hasChildren && (
         <div className="space-y-0.5">
+          {/* 1. Sub-folders */}
           {subNodes.map(subNode => (
             <CategoryNode
               key={subNode.id}
@@ -1271,8 +1420,59 @@ const CategoryNode: React.FC<CategoryNodeProps> = ({
               handleCreateNewPage={handleCreateNewPage}
               setIsAddingCategory={setIsAddingCategory}
               setNewCategoryParentId={setNewCategoryParentId}
+              selectedPageId={selectedPageId}
+              setSelectedPageId={setSelectedPageId}
+              setIsEditingPage={setIsEditingPage}
+              deleteKnowledgePage={deleteKnowledgePage}
             />
           ))}
+
+          {/* 2. Files (Pages) */}
+          {nodePages.map(page => {
+            const isPageSelected = selectedPageId === page.id;
+            const hasAssoc = page.associatedContractId || page.associatedProjectId || page.associatedSupplierName;
+            return (
+              <div
+                key={page.id}
+                style={{ paddingLeft: `${(depth + 1) * 12 + 22}px` }}
+                className={`group flex items-center justify-between rounded px-1.5 py-1 text-[11px] transition-colors cursor-pointer ${
+                  isPageSelected
+                    ? 'bg-blue-600 text-white font-semibold'
+                    : 'text-slate-600 hover:bg-slate-200/50'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPageId(page.id);
+                  setIsEditingPage(false);
+                }}
+              >
+                <div className="flex items-center space-x-1.5 truncate max-w-[80%]">
+                  <FileText size={10} className={isPageSelected ? 'text-white' : 'text-slate-400'} />
+                  <span className="truncate">{page.title}</span>
+                </div>
+                <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {hasAssoc && (
+                    <div className={`h-1.5 w-1.5 rounded-full ${isPageSelected ? 'bg-blue-200' : 'bg-blue-500/80 animate-pulse'}`} />
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm('确定要删除本篇资料吗？此操作无法撤销。')) {
+                        deleteKnowledgePage(page.id);
+                        if (selectedPageId === page.id) {
+                          setSelectedPageId(null);
+                        }
+                      }
+                    }}
+                    title="安全丢弃"
+                    className={`p-0.5 rounded ${isPageSelected ? 'hover:bg-blue-700 text-blue-100' : 'hover:bg-slate-200 text-slate-400 hover:text-red-650'}`}
+                  >
+                    <Trash2 size={9} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

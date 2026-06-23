@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Compass, Layers, Sliders, Anchor, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Compass, Layers, Sliders, Anchor, BookOpen, ClipboardList } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -9,6 +9,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'dashboard', label: '首页', icon: LayoutDashboard },
+    { id: 'checklist', label: '清单', icon: ClipboardList },
     { id: 'pre', label: '前置工作 (需求)', icon: Compass },
     { id: 'post', label: '后置工作 (合同)', icon: Layers },
     { id: 'bid', label: '标书', icon: Anchor },
