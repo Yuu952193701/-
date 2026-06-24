@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAppState } from '../context/AppContext';
 import { WorkflowStep, ColorState } from '../types';
 import { DEFAULT_PRE_STEPS, DEFAULT_POST_STEPS, DEFAULT_BID_STEPS } from '../data';
-import { Plus, Trash2, ArrowUp, ArrowDown, RefreshCw, Eye, Edit3, Settings2, Database, Download, Upload, RotateCcw, AlertTriangle, FileCheck, Terminal, ShieldAlert, FolderOpen, RefreshCw as SpinIcon } from 'lucide-react';
+import { Plus, Trash2, GripVertical, RefreshCw, Eye, Edit3, Settings2, Database, Download, Upload, RotateCcw, AlertTriangle, FileCheck, Terminal, ShieldAlert, FolderOpen, Tag, RefreshCw as SpinIcon } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const {
@@ -23,7 +23,11 @@ export const Settings: React.FC = () => {
     contracts,
     bids,
     bidWorkflow,
-    updateBidWorkflow
+    updateBidWorkflow,
+    recommendedTags,
+    addRecommendedTag,
+    updateRecommendedTag,
+    deleteRecommendedTag
   } = useAppState();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,6 +37,15 @@ export const Settings: React.FC = () => {
   // States for adding a new step
   const [newStepName, setNewStepName] = useState('');
   const [newStepColor, setNewStepColor] = useState<ColorState>('yellow');
+
+  // States for recommended tags management
+  const [newTagName, setNewTagName] = useState('');
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editingTagName, setEditingTagName] = useState('');
+
+  // Drag and drop states for workflow sorting
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const currentWorkflow = activeWorkflowTab === 'pre' ? preWorkflow : activeWorkflowTab === 'post' ? postWorkflow : bidWorkflow;
 
@@ -44,6 +57,43 @@ export const Settings: React.FC = () => {
     } else {
       updateBidWorkflow(updated);
     }
+  };
+
+  // Drag & drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const updated = [...currentWorkflow];
+    const draggedItem = updated[draggedIndex];
+    // Remove from original position
+    updated.splice(draggedIndex, 1);
+    // Insert into target position
+    updated.splice(targetIndex, 0, draggedItem);
+
+    handleUpdate(updated);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   // 1. Add step to current workflow
@@ -241,9 +291,11 @@ export const Settings: React.FC = () => {
 
         {/* Workflow steps layout */}
         <div className="space-y-3 pt-1">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-semibold px-2">
-            <span>正在编排的进度环节序列 (自上而下递位次)</span>
-            <span className="font-mono text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.2 rounded font-normal">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 font-semibold px-2 gap-1">
+            <span className="flex items-center gap-1.5 text-blue-600 font-medium">
+              <span>💡 提示：按住左侧 <b>⋮⋮ #{'{序号}'}</b> 直接上下拖拽小模块，即可快捷调整流程顺序</span>
+            </span>
+            <span className="font-mono text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.2 rounded font-normal self-start sm:self-auto">
               共 {currentWorkflow.length} 个自定义工作状态
             </span>
           </div>
@@ -254,12 +306,28 @@ export const Settings: React.FC = () => {
               return (
                 <div
                   key={step.id}
-                  className="bg-white border border-slate-200/70 p-3 rounded-lg shadow-3xs flex items-center justify-between group hover:border-slate-300 hover:shadow-2xs transition-all animate-fade-in"
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onDrop={(e) => handleDrop(e, index)}
+                  className={`bg-white border p-3 rounded-lg shadow-3xs flex items-center justify-between group hover:border-slate-300 hover:shadow-2xs transition-all animate-fade-in ${
+                    draggedIndex === index 
+                      ? 'opacity-40 border-dashed border-blue-400 bg-blue-50/20' 
+                      : dragOverIndex === index
+                      ? 'border-blue-400 bg-blue-50/10 scale-[1.01]'
+                      : 'border-slate-200/70'
+                  }`}
                 >
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <span className="font-mono text-xs font-bold text-slate-400 bg-slate-100 py-0.5 px-1.8 rounded">
-                      #{index + 1}
-                    </span>
+                    {/* Drag Handle */}
+                    <div 
+                      className="flex items-center space-x-1 font-mono text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 py-0.5 px-2 rounded cursor-grab active:cursor-grabbing select-none transition-colors"
+                      title="按住拖拽以调整次序"
+                    >
+                      <GripVertical size={12} className="text-slate-400 flex-shrink-0" />
+                      <span>#{index + 1}</span>
+                    </div>
                     
                     {/* Status Dot */}
                     <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${
@@ -272,6 +340,8 @@ export const Settings: React.FC = () => {
                     <input
                       type="text"
                       value={step.name}
+                      draggable={false}
+                      onDragStart={(e) => e.stopPropagation()}
                       onChange={(e) => handleRenameStep(index, e.target.value)}
                       className="font-bold text-slate-700 text-sm focus:border-blue-500 focus:outline-none border-b border-transparent hover:border-slate-300 pb-0.5 flex-1 max-w-xs transition-colors"
                       placeholder="输入新步骤名称..."
@@ -279,10 +349,12 @@ export const Settings: React.FC = () => {
                   </div>
 
                   {/* Actions bar for workflow config */}
-                  <div className="flex items-center space-x-2.5">
+                  <div className="flex items-center space-x-2.5" draggable={false} onDragStart={(e) => e.stopPropagation()}>
                     {/* Color selection circles buttons */}
                     <div className="hidden md:flex items-center space-x-1 border border-slate-100 rounded-md p-0.5 bg-slate-50/50">
                       <button
+                        draggable={false}
+                        onDragStart={(e) => e.stopPropagation()}
                         title="标记为用户普通交互状态 (黄色)"
                         onClick={() => handleChangeColor(index, 'yellow')}
                         className={`h-4.5 w-4.5 rounded-sm bg-amber-400 flex items-center justify-center border hover:scale-105 transition-transform cursor-pointer ${
@@ -290,6 +362,8 @@ export const Settings: React.FC = () => {
                         }`}
                       />
                       <button
+                        draggable={false}
+                        onDragStart={(e) => e.stopPropagation()}
                         title="标记为流转等待执行阶段 (绿色)"
                         onClick={() => handleChangeColor(index, 'green')}
                         className={`h-4.5 w-4.5 rounded-sm bg-emerald-500 flex items-center justify-center border hover:scale-105 transition-transform cursor-pointer ${
@@ -297,6 +371,8 @@ export const Settings: React.FC = () => {
                         }`}
                       />
                       <button
+                        draggable={false}
+                        onDragStart={(e) => e.stopPropagation()}
                         title="标记为归档完成结算阶段 (蓝色)"
                         onClick={() => handleChangeColor(index, 'blue')}
                         className={`h-4.5 w-4.5 rounded-sm bg-blue-500 flex items-center justify-center border hover:scale-105 transition-transform cursor-pointer ${
@@ -304,6 +380,8 @@ export const Settings: React.FC = () => {
                         }`}
                       />
                       <button
+                        draggable={false}
+                        onDragStart={(e) => e.stopPropagation()}
                         title="标记为驳回异常追查阶段 (红色)"
                         onClick={() => handleChangeColor(index, 'red')}
                         className={`h-4.5 w-4.5 rounded-sm bg-rose-500 flex items-center justify-center border hover:scale-105 transition-transform cursor-pointer ${
@@ -314,28 +392,10 @@ export const Settings: React.FC = () => {
 
                     <div className="h-4 w-[1px] bg-slate-100 hidden md:block" />
 
-                    {/* Up/Down controls */}
-                    <button
-                      onClick={() => handleMoveStep(index, 'up')}
-                      disabled={index === 0}
-                      className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
-                      title="上移此进度流程"
-                    >
-                      <ArrowUp size={13} />
-                    </button>
-                    <button
-                      onClick={() => handleMoveStep(index, 'down')}
-                      disabled={index === currentWorkflow.length - 1}
-                      className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
-                      title="下移此进度流程"
-                    >
-                      <ArrowDown size={13} />
-                    </button>
-
-                    <div className="h-4 w-[1px] bg-slate-100" />
-
                     {/* Delete single button */}
                     <button
+                      draggable={false}
+                      onDragStart={(e) => e.stopPropagation()}
                       onClick={() => handleDeleteStep(step.id, step.name)}
                       className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-all"
                       title="删除此步骤"
@@ -428,6 +488,157 @@ export const Settings: React.FC = () => {
           </div>
         </form>
 
+      </div>
+
+      {/* 🏷️ 推荐标签管理中心 (Focused on custom user tags management) */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+        {/* Section Title Banner */}
+        <div className="border-b border-slate-100 bg-slate-50/70 p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2">
+              <Tag size={16} className="text-amber-500" />
+              <span>🏷️ 常用推荐标签配置管理</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              在此添加、修改或删除各模块创建时快捷点选的“推荐标签”。保持标签库精简，提升打标效率。
+            </p>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Tag Quick Input Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newTagName.trim()) {
+                addRecommendedTag(newTagName.trim());
+                setNewTagName('');
+              }
+            }}
+            className="flex items-center gap-3 bg-slate-50/50 p-3 rounded-lg border border-slate-200/60"
+          >
+            <div className="relative flex-1">
+              <Tag size={14} className="absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="输入新增常用推荐标签名称（如：机油、电缆、外协服务）"
+                className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-none placeholder-slate-400 font-medium text-slate-700"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!newTagName.trim()}
+              className={`px-4 py-1.8 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
+                newTagName.trim()
+                  ? 'bg-amber-550 bg-amber-500 hover:bg-amber-650 text-white shadow-3xs cursor-pointer'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <Plus size={12} />
+              <span>新增推荐标签</span>
+            </button>
+          </form>
+
+          {/* Tags List Grid */}
+          {recommendedTags.length === 0 ? (
+            <div className="text-center py-8 bg-slate-50/30 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">
+              💡 暂无任何自定义推荐标签。请在上方输入添加，方便项目快速打标！
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {recommendedTags.map((tag) => {
+                const isEditing = editingTagId === tag.id;
+                return (
+                  <div
+                    key={tag.id}
+                    className={`p-2.5 rounded-lg border transition-all flex items-center justify-between gap-2 group ${
+                      isEditing
+                        ? 'bg-blue-50/30 border-blue-300 ring-2 ring-blue-50'
+                        : 'bg-white border-slate-200/80 hover:border-amber-300 hover:bg-slate-50/45'
+                    }`}
+                  >
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5 w-full">
+                        <input
+                          type="text"
+                          value={editingTagName}
+                          onChange={(e) => setEditingTagName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (editingTagName.trim()) {
+                                updateRecommendedTag(tag.id, editingTagName.trim());
+                                setEditingTagId(null);
+                              }
+                            } else if (e.key === 'Escape') {
+                              setEditingTagId(null);
+                            }
+                          }}
+                          className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 w-full focus:outline-none focus:border-blue-500 font-sans"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingTagName.trim()) {
+                              updateRecommendedTag(tag.id, editingTagName.trim());
+                              setEditingTagId(null);
+                            }
+                          }}
+                          className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold hover:bg-emerald-100 cursor-pointer shrink-0"
+                        >
+                          保存
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTagId(null)}
+                          className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold hover:bg-slate-200 cursor-pointer shrink-0"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center space-x-1.5 truncate">
+                          <span className="text-amber-500 text-xs flex-shrink-0">#</span>
+                          <span className="text-xs font-semibold text-slate-700 truncate">{tag.name}</span>
+                        </div>
+
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTagId(tag.id);
+                              setEditingTagName(tag.name);
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 cursor-pointer transition-colors"
+                            title="修改标签名称"
+                          >
+                            <Edit3 size={11} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`确定要移除推荐标签“${tag.name}”吗？\n(这不会影响已标记该标签的现有项目/合同/标书)`)) {
+                                deleteRecommendedTag(tag.id);
+                              }
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
+                            title="删除推荐标签"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 💾 SQLite DATABASE BACKUP & RESTORE SECTION */}

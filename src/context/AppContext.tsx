@@ -98,10 +98,12 @@ interface AppContextProps {
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const IS_PROD_MODE = (import.meta as any).env?.PROD;
+
   // Load from LocalStorage or seed defaults
   const [projects, setProjects] = useState<DemandProject[]>(() => {
     const saved = localStorage.getItem('p_workbench_projects');
-    return saved ? JSON.parse(saved) : INITIAL_DEMAND_PROJECTS;
+    return saved ? JSON.parse(saved) : (IS_PROD_MODE ? [] : INITIAL_DEMAND_PROJECTS);
   });
 
   const [postWorkflow, setPostWorkflow] = useState<WorkflowStep[]>(() => {
@@ -120,7 +122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [contracts, setContracts] = useState<Contract[]>(() => {
     const saved = localStorage.getItem('p_workbench_contracts');
-    let parsed: Contract[] = saved ? JSON.parse(saved) : INITIAL_CONTRACTS;
+    let parsed: Contract[] = saved ? JSON.parse(saved) : (IS_PROD_MODE ? [] : INITIAL_CONTRACTS);
 
     const mapStatus = (status: string) => {
       if (status === '合同签订' || status === '发货中' || status === '到货签收') return '签收单';
@@ -177,7 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [bids, setBids] = useState<BidProject[]>(() => {
     const saved = localStorage.getItem('p_workbench_bids');
-    return saved ? JSON.parse(saved) : INITIAL_BID_PROJECTS;
+    return saved ? JSON.parse(saved) : (IS_PROD_MODE ? [] : INITIAL_BID_PROJECTS);
   });
 
   const [bidWorkflow, setBidWorkflow] = useState<WorkflowStep[]>(() => {
@@ -188,6 +190,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [allTags, setAllTags] = useState<string[]>(() => {
     const saved = localStorage.getItem('p_workbench_all_tags');
     if (saved) return JSON.parse(saved);
+    if (IS_PROD_MODE) {
+      return ['日常备件', '紧急', '备件', '合同', '采购'];
+    }
     // Extracted from seed
     const tagsSet = new Set<string>();
     INITIAL_DEMAND_PROJECTS.forEach(p => p.tags.forEach(t => tagsSet.add(t)));
@@ -204,12 +209,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [knowledgeCategories, setKnowledgeCategories] = useState<KnowledgeCategory[]>(() => {
     const saved = localStorage.getItem('p_workbench_k_categories');
-    return saved ? JSON.parse(saved) : INITIAL_KNOWLEDGE_CATEGORIES;
+    return saved ? JSON.parse(saved) : (IS_PROD_MODE ? [] : INITIAL_KNOWLEDGE_CATEGORIES);
   });
 
   const [knowledgePages, setKnowledgePages] = useState<KnowledgePage[]>(() => {
     const saved = localStorage.getItem('p_workbench_k_pages');
-    return saved ? JSON.parse(saved) : INITIAL_KNOWLEDGE_PAGES;
+    return saved ? JSON.parse(saved) : (IS_PROD_MODE ? [] : INITIAL_KNOWLEDGE_PAGES);
   });
 
   // DB Backup state variables
@@ -920,7 +925,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dueDate: bidData.dueDate,
       tags: bidData.tags ?? [],
       remark: bidData.remark ?? '',
-      folderPath: bidData.folderPath || `D:\\采购\\标书\\${bidData.ship}_${cleanName}`,
       contractId: bidData.contractId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1002,7 +1006,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dueDate: projectData.dueDate,
       tags: projectData.tags ?? [],
       remark: projectData.remark ?? '',
-      folderPath: projectData.folderPath || `D:\\采购\\前置工作\\${cleanCode}${cleanName}`,
       contractId: projectData.contractId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1076,7 +1079,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dueDate: contractData.dueDate,
       tags: contractData.tags ?? [],
       remark: contractData.remark ?? '',
-      folderPath: contractData.folderPath || `D:\\采购\\${contractData.ship}\\${cleanName}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       contractStatus: '执行中',

@@ -16,12 +16,14 @@ export const PostProcurement: React.FC = () => {
     moveContractStep,
     batchAssociateProjects,
     recommendedTags,
+    deleteRecommendedTag,
     addGlobalTag
   } = useAppState();
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeShipTab, setActiveShipTab] = useState<string>('all'); // 'all' or specific ship
+  const [activeShipTab, setActiveShipTab] = useState<string>('all'); // 'all', 'multi', or specific ship
+  const [multiShipSettlementFilter, setMultiShipSettlementFilter] = useState<string>('all'); // 'all' or specific ship
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedColor, setSelectedColor] = useState<string>('all');
   const [filterUrgent, setFilterUrgent] = useState<boolean | 'all'>('all');
@@ -98,6 +100,14 @@ export const PostProcurement: React.FC = () => {
       return;
     }
 
+    const isDuplicate = contracts.some(c => c.name.trim().toLowerCase() === newContractName.trim().toLowerCase());
+    if (isDuplicate) {
+      const proceed = window.confirm(`⚠️ 该合同名称【${newContractName.trim()}】已存在！\n是否确认继续新建重复名称的合同？`);
+      if (!proceed) {
+        return;
+      }
+    }
+
     const cleanCode = newContractCode.trim() || newContractName.trim();
 
     addContract({
@@ -144,30 +154,54 @@ export const PostProcurement: React.FC = () => {
   // Filter logic
   const filteredContracts = contracts.filter(contract => {
     // 1. Ship category tab matching
-    const matchesShipTab = activeShipTab === 'all' || contract.ship.split(',').map(s => s.trim()).includes(activeShipTab);
+    const associatedShips = contract.ship.split(',').map(s => s.trim()).filter(Boolean);
+    const isMultiShipContract = associatedShips.length >= 2;
 
-    // 2. Text Search
+    let matchesShipTab = false;
+    if (activeShipTab === 'all') {
+      matchesShipTab = true;
+    } else if (activeShipTab === 'multi') {
+      matchesShipTab = isMultiShipContract;
+    } else {
+      // Single ship tab (e.g. '鸿鹄01')
+      // Must not be a multi-ship contract, and must match the selected ship
+      matchesShipTab = !isMultiShipContract && associatedShips.includes(activeShipTab);
+    }
+
+    // 2. Text Search - also search within settlement details (multi-batch independent settlement details)
     const searchLower = searchTerm.toLowerCase().trim();
     const associatedProjects = projects.filter(p => p.contractId === contract.id);
     const associatedProjectsTags = associatedProjects.map(p => p.name.toLowerCase() + ' ' + p.code.toLowerCase()).join(' ');
+    
+    // Index multi-batch settlement details
+    const settlementDetails = contract.isMultiSettlement && contract.settlements
+      ? contract.settlements.map(s => `${s.name} ${s.status} ${s.remark || ''} ${s.ship || ''}`).join(' ').toLowerCase()
+      : '';
 
     const matchesSearch = !searchLower ||
       contract.name.toLowerCase().includes(searchLower) ||
       contract.code.toLowerCase().includes(searchLower) ||
       contract.remark.toLowerCase().includes(searchLower) ||
       associatedProjectsTags.includes(searchLower) ||
-      contract.tags.some(t => t.toLowerCase().includes(searchLower));
+      contract.tags.some(t => t.toLowerCase().includes(searchLower)) ||
+      settlementDetails.includes(searchLower);
 
     // 3. Status filter
     const matchesStatus = selectedStatus === 'all' || 
       (contract.isMultiSettlement
-        ? (contract.settlements?.some(s => s.status === selectedStatus) || false)
+        ? (contract.settlements?.some(s => {
+            const matchesMultiShipFilter = activeShipTab !== 'multi' || multiShipSettlementFilter === 'all' || s.ship === multiShipSettlementFilter;
+            return matchesMultiShipFilter && s.status === selectedStatus;
+          }) || false)
         : contract.status === selectedStatus);
 
     // 4. Color indicator filter
     const matchesColor = selectedColor === 'all' || 
       (contract.isMultiSettlement
-        ? (contract.settlements?.some(s => getContractStatusColor(s.status) === selectedColor) || false)
+        ? (contract.settlements?.some(s => {
+            const matchesMultiShipFilter = activeShipTab !== 'multi' || multiShipSettlementFilter === 'all' || s.ship === multiShipSettlementFilter;
+            return matchesMultiShipFilter && getContractStatusColor(s.status) === selectedColor;
+          }) || false)
         : getContractStatusColor(contract.status) === selectedColor);
 
     // 5. Urgency checkbox
@@ -211,7 +245,10 @@ export const PostProcurement: React.FC = () => {
       {/* Categories by Ship selection (horizontal tab group) */}
       <div className="bg-slate-100/80 p-1 rounded-md flex flex-wrap gap-1 border border-slate-200/50">
         <button
-          onClick={() => setActiveShipTab('all')}
+          onClick={() => {
+            setActiveShipTab('all');
+            setMultiShipSettlementFilter('all');
+          }}
           className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
             activeShipTab === 'all'
               ? 'bg-white text-blue-600 shadow-3xs'
@@ -220,8 +257,24 @@ export const PostProcurement: React.FC = () => {
         >
           🚢 全部合同 ({contracts.length})
         </button>
+        <button
+          onClick={() => {
+            setActiveShipTab('multi');
+            setMultiShipSettlementFilter('all');
+          }}
+          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+            activeShipTab === 'multi'
+              ? 'bg-white text-blue-600 shadow-3xs'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
+          }`}
+        >
+          ⛓️ 多船舶 ({contracts.filter(c => c.ship.split(',').map(s => s.trim()).filter(Boolean).length >= 2).length})
+        </button>
         {SHIPS.map(ship => {
-          const shipContractsCount = contracts.filter(c => c.ship.split(',').map(s => s.trim()).includes(ship)).length;
+          const shipContractsCount = contracts.filter(c => {
+            const associated = c.ship.split(',').map(s => s.trim()).filter(Boolean);
+            return associated.length === 1 && associated[0] === ship;
+          }).length;
           return (
             <button
               key={ship}
@@ -254,7 +307,7 @@ export const PostProcurement: React.FC = () => {
         </div>
 
         {/* Multi Criteria Selector */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+        <div className={`grid grid-cols-1 ${activeShipTab === 'multi' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-4 pt-1`}>
           
           {/* Status Step filter */}
           <div>
@@ -308,6 +361,23 @@ export const PostProcurement: React.FC = () => {
               </label>
             </div>
           </div>
+
+          {/* Multi Ship Settlement Filter */}
+          {activeShipTab === 'multi' && (
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">结算所属船舶 (多船筛选)</label>
+              <select
+                value={multiShipSettlementFilter}
+                onChange={(e) => setMultiShipSettlementFilter(e.target.value)}
+                className="w-full rounded-md border border-slate-200 p-1.5 text-xs bg-white focus:outline-none focus:border-blue-500 text-slate-600 font-bold border-blue-250 ring-1 ring-blue-50/50"
+              >
+                <option value="all">⚓ 所有结算期次</option>
+                {SHIPS.map(ship => (
+                  <option key={ship} value={ship}>{ship} 关联期次</option>
+                ))}
+              </select>
+            </div>
+          )}
 
         </div>
 
@@ -442,7 +512,6 @@ export const PostProcurement: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation(); // Avoid opening contract
                               setSelectedItemId(p.id);
-                              alert(`需求项目 📌【${p.code} ${p.name}】属于该合同下。\n当前状态: ${p.status}\n本地文件夹: ${p.folderPath}`);
                             }}
                           >
                             {p.code} {p.name} 🔗
@@ -459,97 +528,137 @@ export const PostProcurement: React.FC = () => {
                     )}
 
                     {/* Dynamic expansion of settlements inside the card */}
-                    {contract.isMultiSettlement && contract.settlements && contract.settlements.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-slate-100 space-y-2 w-full" onClick={(e) => e.stopPropagation()}>
-                        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                          <span>📊 结算批次列表 (直接流转各期进度)</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newNum = contract.settlements!.length + 1;
-                              const nextBatch = {
-                                id: `s-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                                name: `第${newNum}期结算`,
-                                status: '签收单',
-                                remark: ''
-                              };
-                              updateContract(contract.id, {
-                                settlements: [...contract.settlements!, nextBatch]
-                              });
-                            }}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center"
-                          >
-                            + 新增期次
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {contract.settlements.map((s) => {
-                            const bCol = getContractStatusColor(s.status);
-                            return (
-                              <div key={s.id} className="bg-slate-50 border border-slate-250 hover:bg-slate-100/50 rounded-lg p-2 flex items-center justify-between transition-colors">
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center space-x-1.5 flex-wrap">
-                                    <span className="text-xs font-bold text-slate-700">{s.name}</span>
-                                    <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold border ${
-                                      bCol === 'yellow' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                                      bCol === 'green' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                                      bCol === 'blue' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                                      'bg-red-50 text-red-800 border-red-200'
-                                    }`}>
-                                      {s.status}
-                                    </span>
-                                  </div>
-                                  {s.remark && <p className="text-[10px] text-slate-400 italic line-clamp-1">{s.remark}</p>}
-                                </div>
+                    {contract.isMultiSettlement && contract.settlements && contract.settlements.length > 0 && (() => {
+                      const contractShips = contract.ship.split(',').map(name => name.trim()).filter(Boolean);
+                      const displayedSettlements = contract.settlements.filter(s => {
+                        if (activeShipTab === 'multi' && multiShipSettlementFilter !== 'all') {
+                          return s.ship === multiShipSettlementFilter;
+                        }
+                        return true;
+                      });
 
-                                <div className="flex items-center space-x-1 flex-shrink-0">
-                                  <button
-                                    title="退回上一步"
-                                    disabled={postWorkflow.findIndex(step => step.name === s.status) <= 0}
-                                    onClick={() => {
-                                      const sIdx = postWorkflow.findIndex(step => step.name === s.status);
-                                      if (sIdx > 0) {
-                                        const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: postWorkflow[sIdx - 1].name } : item);
-                                        updateContract(contract.id, { settlements: updated });
-                                      }
-                                    }}
-                                    className="p-1 hover:bg-slate-200 border border-slate-200 rounded text-slate-500 disabled:opacity-40"
-                                  >
-                                    <ArrowLeft size={10} />
-                                  </button>
-                                  <button
-                                    title="流转下一步"
-                                    disabled={postWorkflow.findIndex(step => step.name === s.status) >= postWorkflow.length - 1}
-                                    onClick={() => {
-                                      const sIdx = postWorkflow.findIndex(step => step.name === s.status);
-                                      if (sIdx < postWorkflow.length - 1) {
-                                        const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: postWorkflow[sIdx + 1].name } : item);
-                                        updateContract(contract.id, { settlements: updated });
-                                      }
-                                    }}
-                                    className="p-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-blue-600 disabled:opacity-40"
-                                  >
-                                    <ArrowRight size={10} />
-                                  </button>
-                                  <button
-                                    title="删除期次"
-                                    onClick={() => {
-                                      if (window.confirm(`确认删除该笔期次：${s.name} 吗？`)) {
-                                        const updated = contract.settlements!.filter(item => item.id !== s.id);
-                                        updateContract(contract.id, { settlements: updated });
-                                      }
-                                    }}
-                                    className="p-1 hover:bg-red-50 text-rose-500 rounded"
-                                  >
-                                    <Trash2 size={10} />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
+                      return (
+                        <div className="mt-3 pt-3 border-t border-slate-100 space-y-2 w-full" onClick={(e) => e.stopPropagation()}>
+                          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                            <span>📊 结算批次列表 (直接流转各期进度)</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newNum = contract.settlements!.length + 1;
+                                const nextBatch = {
+                                  id: `s-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                                  name: `第${newNum}期结算`,
+                                  status: '签收单',
+                                  remark: '',
+                                  ship: contractShips.length === 1 ? contractShips[0] : ''
+                                };
+                                updateContract(contract.id, {
+                                  settlements: [...contract.settlements!, nextBatch]
+                                });
+                              }}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center"
+                            >
+                              + 新增期次
+                            </button>
+                          </div>
+
+                          {displayedSettlements.length === 0 ? (
+                            <div className="text-[11px] text-slate-400 italic p-3 text-center bg-slate-50 border border-slate-200/50 rounded-lg">
+                              ⚠️ 暂无符合当前筛选船舶【{multiShipSettlementFilter}】的结算期次
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {displayedSettlements.map((s) => {
+                                const bCol = getContractStatusColor(s.status);
+                                return (
+                                  <div key={s.id} className="bg-slate-50 border border-slate-250 hover:bg-slate-100/50 rounded-lg p-2 flex items-center justify-between transition-colors">
+                                    <div className="space-y-0.5 min-w-0 flex-1">
+                                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                                        <span className="text-xs font-bold text-slate-700">{s.name}</span>
+                                        <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold border ${
+                                          bCol === 'yellow' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                                          bCol === 'green' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                                          bCol === 'blue' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                                          'bg-red-50 text-red-800 border-red-200'
+                                        }`}>
+                                          {s.status}
+                                        </span>
+                                        {/* Inline ship selector for multi-ship contract */}
+                                        {contractShips.length >= 2 && (
+                                          <select
+                                            value={s.ship || ''}
+                                            onChange={(e) => {
+                                              const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, ship: e.target.value } : item);
+                                              updateContract(contract.id, { settlements: updated });
+                                            }}
+                                            className="text-[10px] font-semibold bg-white border border-slate-200 rounded px-1.5 py-0.2 text-slate-600 focus:outline-none"
+                                          >
+                                            <option value="">⚓ 指定船舶</option>
+                                            {contractShips.map(sh => (
+                                              <option key={sh} value={sh}>{sh}</option>
+                                            ))}
+                                          </select>
+                                        )}
+                                        {/* Tag for ship name if already specified and not in multiselect */}
+                                        {contractShips.length < 2 && s.ship && (
+                                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1 rounded">
+                                            {s.ship}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {s.remark && <p className="text-[10px] text-slate-400 italic line-clamp-1">{s.remark}</p>}
+                                    </div>
+
+                                    <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
+                                      <button
+                                        title="退回上一步"
+                                        disabled={postWorkflow.findIndex(step => step.name === s.status) <= 0}
+                                        onClick={() => {
+                                          const sIdx = postWorkflow.findIndex(step => step.name === s.status);
+                                          if (sIdx > 0) {
+                                            const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: postWorkflow[sIdx - 1].name } : item);
+                                            updateContract(contract.id, { settlements: updated });
+                                          }
+                                        }}
+                                        className="p-1 hover:bg-slate-200 border border-slate-200 rounded text-slate-500 disabled:opacity-40"
+                                      >
+                                        <ArrowLeft size={10} />
+                                      </button>
+                                      <button
+                                        title="流转下一步"
+                                        disabled={postWorkflow.findIndex(step => step.name === s.status) >= postWorkflow.length - 1}
+                                        onClick={() => {
+                                          const sIdx = postWorkflow.findIndex(step => step.name === s.status);
+                                          if (sIdx < postWorkflow.length - 1) {
+                                            const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: postWorkflow[sIdx + 1].name } : item);
+                                            updateContract(contract.id, { settlements: updated });
+                                          }
+                                        }}
+                                        className="p-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-blue-600 disabled:opacity-40"
+                                      >
+                                        <ArrowRight size={10} />
+                                      </button>
+                                      <button
+                                        title="删除期次"
+                                        onClick={() => {
+                                          if (window.confirm(`确认删除该笔期次：${s.name} 吗？`)) {
+                                            const updated = contract.settlements!.filter(item => item.id !== s.id);
+                                            updateContract(contract.id, { settlements: updated });
+                                          }
+                                        }}
+                                        className="p-1 hover:bg-red-50 text-rose-500 rounded"
+                                      >
+                                        <Trash2 size={10} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                   </div>
 
@@ -805,23 +914,74 @@ export const PostProcurement: React.FC = () => {
                     />
                   </div>
 
+                  {/* Quick-select Recommended Tags */}
+                  {recommendedTags.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1 items-center pb-1">
+                      <span className="text-[10px] text-slate-400 mr-1">推荐点击直接打标:</span>
+                      {recommendedTags.map(rt => {
+                        const isSelected = newContractTags.includes(rt.name);
+                        return (
+                          <button
+                            key={rt.id}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                handleRemoveContractTag(rt.name);
+                              } else {
+                                handleAddContractTag(rt.name);
+                              }
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50 border-blue-200 text-blue-700 font-extrabold'
+                                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            #{rt.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {/* Autocomplete recommendation dropdown */}
                   {showTagOptions && recommendedTags.length > 0 && (
                     <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl z-50 text-xs py-1">
-                      <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold text-[9px] uppercase tracking-wider">推荐标签</div>
+                      <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold text-[9px] uppercase tracking-wider flex items-center justify-between">
+                        <span>推荐标签</span>
+                        <span className="text-[9px] text-slate-350 font-normal normal-case">悬停可删除</span>
+                      </div>
                       {recommendedTags
-                        .map(rt => rt.name)
-                        .filter(t => !newContractTags.includes(t) && t.toLowerCase().includes(newTagInput.toLowerCase()))
-                        .map(t => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => handleAddContractTag(t)}
-                            className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                        .filter(rt => !newContractTags.includes(rt.name) && rt.name.toLowerCase().includes(newTagInput.toLowerCase()))
+                        .map(rt => (
+                          <div
+                            key={rt.id}
+                            className="w-full px-2.5 py-1 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-between cursor-pointer group/rt"
                           >
-                            <span>#{t}</span>
-                            <span className="text-[9px] text-blue-500 bg-blue-50 px-1 py-0.2 rounded font-sans font-bold">选择</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAddContractTag(rt.name)}
+                              className="flex-1 text-left py-1 text-slate-700 font-semibold cursor-pointer"
+                            >
+                              #{rt.name}
+                            </button>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[9px] text-blue-500 bg-blue-50 px-1 py-0.2 rounded font-sans font-bold group-hover/rt:hidden">选择</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`确定要彻底删除推荐标签“${rt.name}”吗？\n(此操作仅移除推荐状态，已打标的现有合同不会受影响)`)) {
+                                    deleteRecommendedTag(rt.id);
+                                  }
+                                }}
+                                className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors opacity-0 group-hover/rt:opacity-100"
+                                title="删除推荐标签"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       <div className="p-1.5 text-center border-t border-slate-100 mt-1 flex justify-between px-2 shrink-0">
                         <span className="text-[9px] text-slate-400 mt-0.5">支持回车生成任意标签</span>

@@ -2,10 +2,33 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure appropriate user directory paths are present
-const USER_DATA_PATH = app.getPath('userData');
-const DB_DIR = path.join(USER_DATA_PATH, 'database');
-const BACKUP_DIR = path.join(USER_DATA_PATH, 'backups');
+// Determine environment and set base path for data isolation
+const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
+let baseDir = '';
+
+if (isDev) {
+  baseDir = process.platform === 'win32' ? 'C:\\dev-data' : '/dev-data';
+} else {
+  baseDir = process.platform === 'win32' ? 'C:\\data' : '/data';
+}
+
+// Ensure the directory exists
+try {
+  if (!fs.existsSync(baseDir)) {
+    fs.mkdirSync(baseDir, { recursive: true });
+  }
+} catch (e) {
+  console.error(`Failed to create base directory ${baseDir}:`, e.message);
+  // Fallback to app path or userData in case of write permission issues
+  const USER_DATA_PATH = app.getPath('userData');
+  baseDir = path.join(USER_DATA_PATH, isDev ? 'dev-data' : 'data');
+  if (!fs.existsSync(baseDir)) {
+    fs.mkdirSync(baseDir, { recursive: true });
+  }
+}
+
+const DB_DIR = path.join(baseDir, 'database');
+const BACKUP_DIR = path.join(baseDir, 'backups');
 
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });

@@ -16,7 +16,7 @@ export interface DemandProject {
   dueDate?: string; // 截止日期 (YYYY-MM-DD or empty)
   tags: string[]; // 自定义标签
   remark: string; // 备注
-  folderPath: string; // 文件夹路径
+  folderPath?: string; // 文件夹路径
   contractId?: string; // 关联合同ID (Nullable)
   createdAt: string;
   updatedAt: string;
@@ -32,7 +32,7 @@ export interface Contract {
   dueDate?: string; // 截止日期
   tags: string[]; // 自定义标签
   remark: string; // 备注
-  folderPath: string; // 文件夹路径
+  folderPath?: string; // 文件夹路径
   createdAt: string;
   updatedAt: string;
 
@@ -49,6 +49,7 @@ export interface SettlementBatch {
   status: string;    // 该批次的结算流程状态 (签收单 → 对账单 → 审核 → 付款申请 → 付款审批 → 付款完成)
   dueDate?: string;  // 要求截止日期
   remark?: string;   // 批次备注说明
+  ship?: string;     // 新增：该批次结算所属船舶 (针对多船舶合同)
 }
 
 export const SHIPS = [
@@ -103,7 +104,7 @@ export interface BidProject {
   dueDate?: string; // 截止日期 (YYYY-MM-DD)
   tags: string[]; // 自定义标签
   remark: string; // 备注
-  folderPath: string; // 文件夹路径
+  folderPath?: string; // 文件夹路径
   contractId?: string; // 关联合同ID (Nullable)
   createdAt: string;
   updatedAt: string;

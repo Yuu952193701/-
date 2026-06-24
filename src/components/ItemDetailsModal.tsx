@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../context/AppContext';
 import { DemandProject, Contract, SHIPS, SettlementBatch, BidProject } from '../types';
-import { X, Folder, Calendar, Copy, Check, Plus, Trash2, Tag, AlertTriangle, Search, Link } from 'lucide-react';
+import { X, Calendar, Plus, Trash2, Tag, AlertTriangle, Search, Link } from 'lucide-react';
 import { formatFullChineseDate, isOverdue } from '../data';
 
 interface ItemDetailsModalProps {
@@ -24,6 +24,8 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
     updateBid,
     allTags,
     addGlobalTag,
+    recommendedTags,
+    deleteRecommendedTag,
     associateProjectToContract
   } = useAppState();
 
@@ -46,8 +48,6 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
   const [dueDate, setDueDate] = useState(currentItem?.dueDate || '');
   const [remark, setRemark] = useState(currentItem?.remark || '');
   const [tags, setTags] = useState<string[]>(currentItem?.tags || []);
-  const [folderPath, setFolderPath] = useState(currentItem?.folderPath || '');
-  const [copied, setCopied] = useState(false);
   
   // Specific to Contract
   const [contractStatus, setContractStatus] = useState<'执行中' | '已完成' | '已终止'>(
@@ -92,7 +92,6 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
       setDueDate(currentItem.dueDate || '');
       setRemark(currentItem.remark || '');
       setTags(currentItem.tags || []);
-      setFolderPath(currentItem.folderPath || '');
       
       if (type === 'contract' && contractItem) {
         setContractStatus(contractItem.contractStatus || '执行中');
@@ -126,13 +125,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
     }
   };
 
-  const handleCopyFolder = () => {
-    if (folderPath) {
-      navigator.clipboard.writeText(folderPath);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+
 
   const handleAddTag = (tagText: string) => {
     const trimmed = tagText.trim();
@@ -224,6 +217,12 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                 className="w-full text-xl font-bold text-slate-800 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none pb-1 transition-colors"
                 placeholder="输入名称..."
               />
+              {type === 'contract' && name.trim() && contracts.some(c => c.id !== itemId && c.name.trim().toLowerCase() === name.trim().toLowerCase()) && (
+                <div className="text-rose-500 text-xs font-bold mt-1.5 flex items-center space-x-1">
+                  <AlertTriangle size={12} />
+                  <span>⚠️ 该合同名称已存在，请确认是否重复！</span>
+                </div>
+              )}
             </div>
             <div className="flex flex-col justify-end h-full pt-4 md:pt-0">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">
@@ -588,48 +587,74 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                     </div>
 
                     {/* Batch Content (Status & Due Date) */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1">
-                          结算业务状态
-                        </label>
-                        <select
-                          value={batch.status}
-                          onChange={(e) => {
-                            const updated = settlements.map(b => b.id === batch.id ? { ...b, status: e.target.value } : b);
-                            setSettlements(updated);
-                            handleSaveField({ settlements: updated });
-                          }}
-                          className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          {postWorkflow.map(step => {
-                            const colorEmoji = step.color === 'yellow' ? '🟡' : step.color === 'green' ? '🟢' : step.color === 'blue' ? '🔵' : step.color === 'red' ? '🔴' : '⚪';
-                            const hasEmoji = /^[^\w\s\u4e00-\u9fa5]{1,2}\s/.test(step.name);
-                            const displayName = hasEmoji ? step.name : `${colorEmoji} ${step.name}`;
-                            return (
-                              <option key={step.id} value={step.name}>
-                                {displayName}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1">
-                          本批截止日期
-                        </label>
-                        <input
-                          type="date"
-                          value={batch.dueDate || ''}
-                          onChange={(e) => {
-                            const updated = settlements.map(b => b.id === batch.id ? { ...b, dueDate: e.target.value || undefined } : b);
-                            setSettlements(updated);
-                            handleSaveField({ settlements: updated });
-                          }}
-                          className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
+                    {(() => {
+                      const contractShips = ship.split(',').map(s => s.trim()).filter(Boolean);
+                      return (
+                        <div className={`grid ${contractShips.length >= 2 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'} gap-3`}>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              结算业务状态
+                            </label>
+                            <select
+                              value={batch.status}
+                              onChange={(e) => {
+                                const updated = settlements.map(b => b.id === batch.id ? { ...b, status: e.target.value } : b);
+                                setSettlements(updated);
+                                handleSaveField({ settlements: updated });
+                              }}
+                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            >
+                              {postWorkflow.map(step => {
+                                const colorEmoji = step.color === 'yellow' ? '🟡' : step.color === 'green' ? '🟢' : step.color === 'blue' ? '🔵' : step.color === 'red' ? '🔴' : '⚪';
+                                const hasEmoji = /^[^\w\s\u4e00-\u9fa5]{1,2}\s/.test(step.name);
+                                const displayName = hasEmoji ? step.name : `${colorEmoji} ${step.name}`;
+                                return (
+                                  <option key={step.id} value={step.name}>
+                                    {displayName}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              本批截止日期
+                            </label>
+                            <input
+                              type="date"
+                              value={batch.dueDate || ''}
+                              onChange={(e) => {
+                                const updated = settlements.map(b => b.id === batch.id ? { ...b, dueDate: e.target.value || undefined } : b);
+                                setSettlements(updated);
+                                handleSaveField({ settlements: updated });
+                              }}
+                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          {contractShips.length >= 2 && (
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                结算关联船舶
+                              </label>
+                              <select
+                                value={batch.ship || ''}
+                                onChange={(e) => {
+                                  const updated = settlements.map(b => b.id === batch.id ? { ...b, ship: e.target.value } : b);
+                                  setSettlements(updated);
+                                  handleSaveField({ settlements: updated });
+                                }}
+                                className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-700"
+                              >
+                                <option value="">⚓ 未指定</option>
+                                {contractShips.map(sh => (
+                                  <option key={sh} value={sh}>{sh}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Batch Remark */}
                     <div>
@@ -653,55 +678,6 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
               </div>
             )}
 
-          </div>
-
-          <hr className="border-slate-100" />
-
-          {/* Folder Path Simulation */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
-              本地工作文件夹路径
-            </label>
-            <div className="flex items-center space-x-2">
-              <div className="flex-1 flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-mono text-xs text-slate-600 overflow-x-auto whitespace-nowrap">
-                <Folder size={14} className="text-slate-400 mr-2 flex-shrink-0" />
-                <input
-                  type="text"
-                  value={folderPath}
-                  onChange={(e) => {
-                    setFolderPath(e.target.value);
-                    handleSaveField({ folderPath: e.target.value });
-                  }}
-                  className="bg-transparent flex-1 focus:outline-none font-mono min-w-[200px]"
-                  placeholder="如 D:\采购\工作文件夹..."
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyFolder}
-                title="复制文件夹路径"
-                className="p-2.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors flex-shrink-0"
-              >
-                {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-              </button>
-            </div>
-            <div className="mt-1.5 flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                记录工作文件夹在电脑上的绝对路径，以便于快速归档整理。
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  alert(`📂 正在打开资源管理器模拟器\n目标路径: ${folderPath || '「未设置」'}\n\n已为您复制路径到剪贴板，您也可以在资源管理器中直接按下Ctrl+V。`);
-                  if (folderPath) {
-                    navigator.clipboard.writeText(folderPath);
-                  }
-                }}
-                className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-semibold"
-              >
-                模拟打开文件夹 ↗
-              </button>
-            </div>
           </div>
 
           <hr className="border-slate-100" />
@@ -746,24 +722,46 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                 {/* Autocomplete dropdown for tags */}
                 {showTagOptions && (
                   <div className="absolute left-0 bottom-full mb-1 w-56 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg z-50 text-xs py-1">
-                    <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold">推荐标签</div>
-                    {(Array.from(new Set(allTags)) as string[])
-                      .filter(t => !tags.includes(t) && t.toLowerCase().includes(newTag.toLowerCase()))
-                      .map(t => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => handleAddTag(t)}
-                          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between"
+                    <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold flex items-center justify-between">
+                      <span>推荐标签</span>
+                      <span className="text-[10px] text-slate-300 font-normal">悬停可删除</span>
+                    </div>
+                    {recommendedTags
+                      .filter(rt => !tags.includes(rt.name) && rt.name.toLowerCase().includes(newTag.toLowerCase()))
+                      .map(rt => (
+                        <div
+                          key={rt.id}
+                          className="w-full px-2 py-1 hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-between group/rt"
                         >
-                          <span>{t}</span>
-                          <Tag size={10} className="text-slate-300" />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddTag(rt.name)}
+                            className="flex-1 text-left py-1 text-slate-700 font-medium cursor-pointer"
+                          >
+                            #{rt.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`确定要彻底删除推荐标签“${rt.name}”吗？\n(此操作仅移除推荐状态，现有已打标项目不会被修改)`)) {
+                                deleteRecommendedTag(rt.id);
+                              }
+                            }}
+                            className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors opacity-0 group-hover/rt:opacity-100"
+                            title="从推荐库中删除此标签"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
                       ))}
+                    {recommendedTags.filter(rt => !tags.includes(rt.name) && rt.name.toLowerCase().includes(newTag.toLowerCase())).length === 0 && (
+                      <div className="px-2.5 py-2 text-[10px] text-slate-400 text-center">暂无匹配推荐标签</div>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowTagOptions(false)}
-                      className="w-full text-center px-1 py-1 text-blue-500 hover:text-blue-700 border-t border-slate-50 mt-1"
+                      className="w-full text-center px-1 py-1 text-blue-500 hover:text-blue-700 border-t border-slate-50 mt-1 cursor-pointer font-semibold"
                     >
                       关闭候选
                     </button>
@@ -809,7 +807,6 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                         <span>关联详情：{connectedContract.name}</span>
                         <span className="text-blue-600 font-semibold">{connectedContract.status}</span>
                       </div>
-                      <p className="text-slate-400 font-mono">文件夹: {connectedContract.folderPath || '未设置'}</p>
                     </div>
                   )}
                 </div>
@@ -848,7 +845,6 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                         <span>关联详情：{connectedContract.name}</span>
                         <span className="text-blue-600 font-semibold">{connectedContract.status}</span>
                       </div>
-                      <p className="text-slate-400 font-mono">文件夹: {connectedContract.folderPath || '未设置'}</p>
                     </div>
                   )}
                 </div>

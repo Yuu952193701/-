@@ -19,6 +19,7 @@ export const Bidding: React.FC = () => {
     deleteBid,
     moveBidStep,
     recommendedTags,
+    deleteRecommendedTag,
     addGlobalTag
   } = useAppState();
 
@@ -349,16 +350,16 @@ export const Bidding: React.FC = () => {
                 {/* Columns: Left Text content */}
                 <div 
                   onClick={() => setSelectedItemId(bid.id)}
-                  className="flex-1 cursor-pointer select-none space-y-1.5"
+                  className="flex-1 cursor-pointer select-none space-y-2"
                 >
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     {/* Ship classification */}
-                    <span className="font-mono text-[10px] font-bold text-slate-400 border border-slate-200/80 rounded bg-slate-50 px-1.5 py-0.5">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/65">
                       🚢 {bid.ship}
                     </span>
 
                     {/* Result Status badge */}
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border ${
                       bid.resultStatus === '已中标' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                       bid.resultStatus === '未中标' ? 'bg-slate-50 text-slate-500 border-slate-200' :
                       bid.resultStatus === '已终止' ? 'bg-rose-50 text-rose-700 border-rose-200' :
@@ -369,54 +370,49 @@ export const Bidding: React.FC = () => {
 
                     {/* Urgency status */}
                     {bid.isUrgent && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-600 border border-rose-150 animate-pulse">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
                         🚨 紧急
                       </span>
                     )}
 
                     {/* Due Date Indicator */}
                     {bid.dueDate && (
-                      <span className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded border font-semibold ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border ${
                         overdue 
-                          ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                          ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse' 
                           : 'bg-slate-50 text-slate-600 border-slate-200/85'
                       }`}>
                         📅 截止: {bid.dueDate} {overdue && '(已逾期)'}
                       </span>
                     )}
+
+                    {/* Custom Tags */}
+                    {bid.tags && bid.tags.length > 0 && Array.from(new Set(bid.tags)).map(tag => (
+                      <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
 
                   {/* Main Title content */}
                   <div>
-                    <h3 className="text-sm font-bold text-slate-700 hover:text-blue-600 transition-colors">
+                    <h3 className="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors">
                       {bid.name}
                     </h3>
                     {bid.tenderUnit && (
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        招标代办/建设单位: <span className="font-semibold text-slate-500">{bid.tenderUnit}</span>
+                        招标单位/发包方: <span className="font-semibold text-slate-500">{bid.tenderUnit}</span>
                       </p>
                     )}
                   </div>
 
-                  {/* Tags and horizontal detail display line */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                    {/* Render tags */}
-                    {bid.tags.length > 0 ? (
-                      bid.tags.map((tag, i) => (
-                        <span key={i} className="inline-flex items-center text-[10px] font-medium bg-slate-100 hover:bg-slate-200/60 text-slate-600 px-1.8 py-0.2 rounded transition-colors">
-                          🏷️ {tag}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-[10px] text-slate-300 font-medium">无自定义快捷标签</span>
-                    )}
-
-                    {bid.remark && (
-                      <span className="text-[10px] text-slate-400 max-w-xs truncate" title={bid.remark}>
-                        | 💡 备注: {bid.remark}
-                      </span>
-                    )}
-                  </div>
+                  {/* Horizontal detail remark display line */}
+                  {bid.remark && (
+                    <div className="text-[11px] text-slate-450 text-slate-500 flex items-center space-x-1">
+                      <span className="text-blue-500">💡</span>
+                      <span className="italic truncate max-w-xl" title={bid.remark}>备注: {bid.remark}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Columns: Right Side Actions & state advancement */}
@@ -496,38 +492,38 @@ export const Bidding: React.FC = () => {
 
       {/* ================= MODAL: CREATE BID ================= */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl border border-slate-200 overflow-hidden animate-zoom-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-700 flex items-center space-x-1.5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg border border-slate-100 animate-slide-in text-slate-800 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 flex-shrink-0">
+              <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2">
                 <span>➕ 注册登记新标书文件案</span>
               </h3>
               <button 
                 onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-slate-650 transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-650 p-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateBid} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+            <form onSubmit={handleCreateBid} className="space-y-4 overflow-y-auto pr-1 flex-1 pb-2">
               
               {/* Field 1: Name and ID selection */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">标书编号 / ID <span className="text-rose-500">*</span></label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">标书编号 / ID <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
                     required
                     value={newBidId}
                     onChange={(e) => setNewBidId(e.target.value)}
                     placeholder="如：BID2026-001"
-                    className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none font-mono"
+                    className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">标书名称 <span className="text-rose-500">*</span></label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">标书名称 <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
                     required
@@ -536,26 +532,27 @@ export const Bidding: React.FC = () => {
                       setNewName(e.target.value);
                     }}
                     placeholder="如：XX海域电缆备件采购投标"
-                    className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Field 2: Ship Multi-select checklist */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  所属船舶 <span className="text-[10px] text-blue-500 font-bold tracking-normal">(支持多选)</span> <span className="text-rose-500">*</span>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+                  <span>所属船舶 (可多选) <span className="text-rose-500">*</span></span>
+                  <span className="text-[9px] text-blue-500 font-bold lowercase tracking-normal">已选: {newShip.split(',').map(item => item.trim()).filter(Boolean).length}艘</span>
                 </label>
-                <div className="flex flex-wrap gap-2 p-2.5 border border-slate-200 bg-slate-50/70 rounded-md">
+                <div className="flex flex-wrap gap-1.5 p-1.5 border border-slate-200 bg-slate-50/50 rounded-md max-h-24 overflow-y-auto">
                   {SHIPS.map(s => {
                     const shipList = newShip.split(',').map(item => item.trim()).filter(Boolean);
                     const isChecked = shipList.includes(s);
                     return (
                       <label 
                         key={s} 
-                        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md border text-xs font-semibold transition-all cursor-pointer ${
+                        className={`flex items-center space-x-1 px-1.5 py-0.5 rounded border text-[10px] font-bold transition-all cursor-pointer ${
                           isChecked 
-                            ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-3xs' 
+                            ? 'bg-blue-50/80 border-blue-200 text-blue-700 shadow-3xs' 
                             : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
@@ -576,7 +573,7 @@ export const Bidding: React.FC = () => {
                             const finalString = sortedList.join(', ');
                             setNewShip(finalString);
                           }}
-                          className="h-3.5 w-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                          className="h-3 w-3 rounded text-blue-600 focus:ring-blue-500 border-slate-350 cursor-pointer"
                         />
                         <span>{s}</span>
                       </label>
@@ -588,30 +585,30 @@ export const Bidding: React.FC = () => {
               {/* Field 3: Tendering Unit and Due Date */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">招标单位 (可选)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">招标单位 (可选)</label>
                   <input
                     type="text"
                     value={newTenderUnit}
                     onChange={(e) => setNewTenderUnit(e.target.value)}
                     placeholder="如：国家电投海南公司"
-                    className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">投标截止时间</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">投标截止时间</label>
                   <input
                     type="date"
                     value={newDueDate}
                     onChange={(e) => setNewDueDate(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/*              {/* Field 3: Tags list */}
+              {/* Field 3: Tags list */}
               <div>
-                <label className="block text-xs font-bold text-slate-550 text-slate-500 uppercase tracking-wider mb-1.5">自定义识别标签 (回车快速创建)</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">自定义标签 (回车快速创建)</label>
                 <div className="relative">
                   <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-lg min-h-[38px] items-center mb-1.5 focus-within:bg-white focus-within:border-blue-500 transition-all">
                     {newBidTags.map(tag => (
@@ -641,23 +638,74 @@ export const Bidding: React.FC = () => {
                     />
                   </div>
 
+                  {/* Quick-select Recommended Tags */}
+                  {recommendedTags.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1 items-center pb-1">
+                      <span className="text-[10px] text-slate-400 mr-1">推荐点击直接打标:</span>
+                      {recommendedTags.map(rt => {
+                        const isSelected = newBidTags.includes(rt.name);
+                        return (
+                          <button
+                            key={rt.id}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                handleRemoveBidTag(rt.name);
+                              } else {
+                                handleAddBidTag(rt.name);
+                              }
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50 border-blue-200 text-blue-700 font-extrabold'
+                                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            #{rt.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {/* Autocomplete recommendation dropdown */}
                   {showTagOptions && recommendedTags.length > 0 && (
                     <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl z-50 text-xs py-1">
-                      <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold text-[9px] uppercase tracking-wider">系统推荐候选标签</div>
+                      <div className="px-2 py-1 text-slate-400 border-b border-slate-100 pb-1 font-semibold text-[9px] uppercase tracking-wider flex items-center justify-between">
+                        <span>系统推荐候选标签</span>
+                        <span className="text-[9px] text-slate-350 font-normal normal-case">悬停可删除</span>
+                      </div>
                       {recommendedTags
-                        .map(rt => rt.name)
-                        .filter(t => !newBidTags.includes(t) && t.toLowerCase().includes(newTagInput.toLowerCase()))
-                        .map(t => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => handleAddBidTag(t)}
-                            className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-between cursor-pointer"
+                        .filter(rt => !newBidTags.includes(rt.name) && rt.name.toLowerCase().includes(newTagInput.toLowerCase()))
+                        .map(rt => (
+                          <div
+                            key={rt.id}
+                            className="w-full px-2.5 py-1 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-between cursor-pointer group/rt"
                           >
-                            <span>#{t}</span>
-                            <span className="text-[9px] text-blue-500 bg-blue-50 px-1 py-0.2 rounded font-sans font-bold">选择</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAddBidTag(rt.name)}
+                              className="flex-1 text-left py-1 text-slate-700 font-semibold cursor-pointer"
+                            >
+                              #{rt.name}
+                            </button>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[9px] text-blue-500 bg-blue-50 px-1 py-0.2 rounded font-sans font-bold group-hover/rt:hidden">选择</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`确定要彻底删除推荐标签“${rt.name}”吗？\n(此操作仅移除推荐状态，已打标的现有标书不会受影响)`)) {
+                                    deleteRecommendedTag(rt.id);
+                                  }
+                                }}
+                                className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors opacity-0 group-hover/rt:opacity-100"
+                                title="删除推荐标签"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       <div className="p-1.5 text-center border-t border-slate-100 mt-1 flex justify-between px-2 shrink-0">
                         <span className="text-[9px] text-slate-400 mt-0.5">支持回车生成任何标签</span>
@@ -683,34 +731,34 @@ export const Bidding: React.FC = () => {
                   onChange={(e) => setNewIsUrgent(e.target.checked)}
                   className="rounded text-blue-600 border-slate-300 focus:ring-blue-500"
                 />
-                <label htmlFor="newIsUrgent" className="text-xs font-extrabold text-rose-600 select-none cursor-pointer flex items-center space-x-1">
+                <label htmlFor="newIsUrgent" className="text-[11px] font-bold text-rose-600 select-none cursor-pointer flex items-center space-x-1">
                   <span>🚨 设定为特急跟进标书项目</span>
                 </label>
               </div>
 
               {/* Field 4: Custom remark description */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">标书项目备注与说明信息</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">标书项目备注与说明信息</label>
                 <textarea
                   value={newRemark}
                   onChange={(e) => setNewRemark(e.target.value)}
                   rows={3}
                   placeholder="记录该标书推进过程中发现的技术难度点、要事、特殊保函要求等..."
-                  className="w-full rounded-md border border-slate-200 px-3 py-1.8 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-2">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-xs font-semibold border border-slate-200 rounded-md hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-all cursor-pointer"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold bg-blue-650 hover:bg-blue-700 text-white rounded-md transition-all shadow-3xs cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-3xs transition-all cursor-pointer"
                 >
                   保存登记件
                 </button>
