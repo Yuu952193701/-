@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppState } from '../context/AppContext';
 import { DemandProject, Contract, SHIPS, SettlementBatch, BidProject } from '../types';
 import { X, Calendar, Plus, Trash2, Tag, AlertTriangle, Search, Link } from 'lucide-react';
@@ -247,7 +248,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
   // Filter projects not associated with any contract
   const unlinkedProjects = projects.filter(p => !p.contractId || p.contractId === '');
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200" id="root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(1) > div:nth-of-type(2)">
       <div className="relative h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in p-0 text-slate-800">
         
@@ -378,7 +379,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                 </div>
               </div>
             ) : type === 'contract' ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 col-span-1 md:col-span-2">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
                     合同编号
@@ -1633,6 +1634,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -179,13 +179,20 @@ export const PostProcurement: React.FC = () => {
       ? contract.settlements.map(s => `${s.name} ${s.status} ${s.remark || ''} ${s.ship || ''}`).join(' ').toLowerCase()
       : '';
 
+    // Find associated supplier name and contract amount
+    const associatedSupplier = contract.supplierId ? suppliers.find(s => s.id === contract.supplierId) : null;
+    const supplierNameLower = associatedSupplier ? associatedSupplier.name.toLowerCase() : '';
+    const contractAmountLower = contract.amount ? contract.amount.toLowerCase() : '';
+
     const matchesSearch = !searchLower ||
       contract.name.toLowerCase().includes(searchLower) ||
       contract.code.toLowerCase().includes(searchLower) ||
       contract.remark.toLowerCase().includes(searchLower) ||
       associatedProjectsTags.includes(searchLower) ||
       contract.tags.some(t => t.toLowerCase().includes(searchLower)) ||
-      settlementDetails.includes(searchLower);
+      settlementDetails.includes(searchLower) ||
+      supplierNameLower.includes(searchLower) ||
+      contractAmountLower.includes(searchLower);
 
     // 3. Status filter
     const matchesStatus = selectedStatus === 'all' || 
@@ -258,19 +265,6 @@ export const PostProcurement: React.FC = () => {
         >
           🚢 全部合同 ({contracts.length})
         </button>
-        <button
-          onClick={() => {
-            setActiveShipTab('multi');
-            setMultiShipSettlementFilter('all');
-          }}
-          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-            activeShipTab === 'multi'
-              ? 'bg-white text-blue-600 shadow-3xs'
-              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
-          }`}
-        >
-          ⛓️ 多船舶 ({contracts.filter(c => c.ship.split(',').map(s => s.trim()).filter(Boolean).length >= 2).length})
-        </button>
         {SHIPS.map(ship => {
           const shipContractsCount = contracts.filter(c => {
             const associated = c.ship.split(',').map(s => s.trim()).filter(Boolean);
@@ -290,6 +284,19 @@ export const PostProcurement: React.FC = () => {
             </button>
           );
         })}
+        <button
+          onClick={() => {
+            setActiveShipTab('multi');
+            setMultiShipSettlementFilter('all');
+          }}
+          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+            activeShipTab === 'multi'
+              ? 'bg-white text-blue-600 shadow-3xs'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
+          }`}
+        >
+          ⛓️ 多船舶 ({contracts.filter(c => c.ship.split(',').map(s => s.trim()).filter(Boolean).length >= 2).length})
+        </button>
       </div>
 
       {/* Filter Box */}
@@ -303,7 +310,7 @@ export const PostProcurement: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none placeholder-slate-400 text-slate-800"
-            placeholder="搜索合同编码、名称、备注说明、关联前置项目（A001）或标签..."
+            placeholder="搜索合同编码、名称、金额、公司/供应商、备注说明、关联前置项目或标签..."
           />
         </div>
 

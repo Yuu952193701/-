@@ -13,7 +13,8 @@ export const PreProcurement: React.FC = () => {
     addProject,
     updateProject,
     deleteProject,
-    moveProjectStep
+    moveProjectStep,
+    suppliers
   } = useAppState();
 
   // Search and Filter States
@@ -77,12 +78,27 @@ export const PreProcurement: React.FC = () => {
     const searchLower = searchTerm.toLowerCase().trim();
     const associatedContract = project.contractId ? contracts.find(c => c.id === project.contractId) : null;
     const contractLabel = associatedContract ? associatedContract.name.toLowerCase() : '';
+    const contractAmount = associatedContract?.amount ? associatedContract.amount.toLowerCase() : '';
+    
+    const contractSupplier = associatedContract?.supplierId ? suppliers.find(s => s.id === associatedContract.supplierId) : null;
+    const contractSupplierName = contractSupplier ? contractSupplier.name.toLowerCase() : '';
+
+    const inquirySupplierNames = (project.inquiries || []).map(inq => {
+      const sup = suppliers.find(s => s.id === inq.supplierId);
+      return sup ? sup.name.toLowerCase() : '';
+    }).join(' ');
+
+    const inquiryQuoteAmounts = (project.inquiries || []).map(inq => inq.quoteAmount || '').join(' ').toLowerCase();
     
     const matchesSearch = !searchLower || 
       project.code.toLowerCase().includes(searchLower) ||
       project.name.toLowerCase().includes(searchLower) ||
       project.remark.toLowerCase().includes(searchLower) ||
       contractLabel.includes(searchLower) ||
+      contractAmount.includes(searchLower) ||
+      contractSupplierName.includes(searchLower) ||
+      inquirySupplierNames.includes(searchLower) ||
+      inquiryQuoteAmounts.includes(searchLower) ||
       project.tags.some(tag => tag.toLowerCase().includes(searchLower));
 
     // 2. Ship match
@@ -146,7 +162,7 @@ export const PreProcurement: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none placeholder-slate-400 text-slate-800"
-              placeholder="搜索项目编号, 项目名称, 关联合同, 备注, 标签内容或物料属性..."
+              placeholder="搜索项目编号, 项目名称, 金额, 公司/供应商, 关联合同, 备注, 标签内容或物料属性..."
             />
           </div>
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppState } from '../context/AppContext';
 import { Supplier, SupplierContact, SupplierCustomAttr } from '../types';
-import { X, Plus, Trash2, User, Phone, Mail, Building, Briefcase, Tag, FileText, ExternalLink, ShieldCheck, HelpCircle } from 'lucide-react';
+import { X, Plus, Trash2, User, Phone, Mail, Building, Briefcase, Tag, FileText, ExternalLink, ShieldCheck, HelpCircle, ArrowUpDown } from 'lucide-react';
 
 interface SupplierDetailsModalProps {
   supplierId: string;
@@ -22,6 +23,7 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
     updateSupplier,
     projects,
     contracts,
+    postWorkflow,
   } = useAppState();
 
   const supplier = suppliers.find(s => s.id === supplierId);
@@ -32,6 +34,7 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
   const [contacts, setContacts] = useState<SupplierContact[]>([]);
   const [customAttributes, setCustomAttributes] = useState<SupplierCustomAttr[]>([]);
   const [notes, setNotes] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // 'asc' = Positive order (early stages on top), 'desc' = Reverse order (late stages on top)
 
   // Initial load
   useEffect(() => {
@@ -45,15 +48,16 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
   }, [supplierId, supplier]);
 
   if (!supplier) {
-    return (
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl p-6 text-center shadow-lg max-w-sm w-full">
+    return createPortal(
+      <div className="fixed inset-0 bg-slate-950/20 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl p-6 text-center shadow-lg max-w-sm w-full border border-slate-150">
           <p className="text-slate-500 text-sm">该供应商数据未找到</p>
           <button onClick={onClose} className="mt-4 px-4 py-2 bg-slate-100 rounded text-xs hover:bg-slate-200">
             关闭
           </button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -158,9 +162,25 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
     c.supplierId === supplier.id
   );
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden animate-fade-in">
+  // Status priority mapping: build dynamically from postWorkflow
+  const sortedContracts = [...associatedContracts].sort((a, b) => {
+    const indexA = postWorkflow.findIndex(step => step.name === a.status);
+    const indexB = postWorkflow.findIndex(step => step.name === b.status);
+    
+    // Extensible fallback: if status is not found in custom postWorkflow stages, place it at the end
+    const priorityA = indexA === -1 ? postWorkflow.length : indexA;
+    const priorityB = indexB === -1 ? postWorkflow.length : indexB;
+    
+    if (sortOrder === 'asc') {
+      return priorityA - priorityB;
+    } else {
+      return priorityB - priorityA;
+    }
+  });
+
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-950/30 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl h-[92vh] md:h-[85vh] flex flex-col overflow-hidden animate-fade-in">
         
         {/* Modal Header */}
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-200/60 flex items-center justify-between">
@@ -206,10 +226,10 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
         </div>
 
         {/* Modal Content - Split layout */}
-        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+        <div className="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
           
           {/* Left Panel: Contacts, Attributes & Document Notes Editor (60%) */}
-          <div className="flex-1 p-6 overflow-y-auto space-y-6 border-b md:border-b-0 md:border-r border-slate-200/60 scrollbar-thin">
+          <div className="w-full md:flex-1 p-5 sm:p-6 overflow-y-visible md:overflow-y-auto space-y-6 border-b md:border-b-0 md:border-r border-slate-200/60 custom-scrollbar">
             
             {/* 1. Contacts Management Section */}
             <div className="space-y-3">
@@ -364,7 +384,7 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
             </div>
 
             {/* 3. Free Memo / Notebook (备忘录/文档编辑器) */}
-            <div className="space-y-2 flex flex-col h-[280px]">
+            <div className="space-y-2 flex flex-col h-[200px] md:h-[280px]">
               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1.5 flex-shrink-0">
                 <FileText size={14} className="text-amber-500" />
                 <span>✍️ 供应商备忘录 & 合作档案 (文档编辑器模式)</span>
@@ -383,83 +403,34 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
           </div>
 
           {/* Right Panel: CRM Cooperative Records & Linkage Trace (40%) */}
-          <div className="w-full md:w-[40%] bg-slate-50/80 p-6 overflow-y-auto space-y-6 flex flex-col scrollbar-thin">
+          <div className="w-full md:w-[40%] bg-slate-50/80 p-5 sm:p-6 overflow-y-visible md:overflow-y-auto flex flex-col custom-scrollbar">
             
-            {/* Associated Pre-Work / Demand Projects */}
-            <div className="space-y-3 flex flex-col flex-1 min-h-[220px]">
-              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center justify-between">
-                <span className="flex items-center space-x-1.5">
-                  <ShieldCheck size={14} className="text-teal-600" />
-                  <span>关联前置需求 ({associatedProjects.length})</span>
-                </span>
-                <HelpCircle size={12} className="text-slate-400" title="在此供应商参与了询比价工作的需求项目" />
-              </h4>
-
-              {associatedProjects.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-6 border border-dashed border-slate-200 rounded-xl bg-white text-center text-slate-400">
-                  <span className="text-[10px] font-medium">暂无关联的前置采购需求工作</span>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                  {associatedProjects.map(p => {
-                    const inquiry = p.inquiries?.find(i => i.supplierId === supplier.id);
-                    const isQuoted = inquiry?.hasQuoted || false;
-
-                    return (
-                      <div 
-                        key={p.id}
-                        className="bg-white border border-slate-200 hover:border-blue-300 rounded-lg p-3 shadow-3xs transition-all duration-150 group"
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <span className="font-mono text-[9px] text-slate-400 block">{p.code}</span>
-                            <span className="text-xs font-bold text-slate-800 line-clamp-1">{p.name}</span>
-                            <span className="text-[10px] text-slate-500 mt-1 block">🚢 {p.ship} | 步骤: {p.status}</span>
-                          </div>
-                          
-                          {/* Action & Status Badges */}
-                          <div className="flex flex-col items-end gap-1.5">
-                            <span className={`inline-flex px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                              isQuoted ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'
-                            }`}>
-                              {isQuoted ? '已报价' : '未报价'}
-                            </span>
-                            
-                            {onOpenProject && (
-                              <button
-                                onClick={() => onOpenProject(p.id)}
-                                className="text-blue-600 hover:text-blue-800 text-[10px] font-semibold flex items-center space-x-0.5 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <span>跳转</span>
-                                <ExternalLink size={10} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
             {/* Associated Post-Work / Contracts (Cooperative History) */}
-            <div className="space-y-3 flex flex-col flex-1 min-h-[220px]">
-              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center justify-between">
-                <span className="flex items-center space-x-1.5">
+            <div className="space-y-3 flex flex-col flex-1 min-h-[300px]">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center space-x-1.5">
                   <FileText size={14} className="text-indigo-600" />
                   <span>历史合作合同记录 ({associatedContracts.length})</span>
-                </span>
-                <span className="text-[10px] font-mono font-extrabold text-indigo-600">小型ERP档案</span>
-              </h4>
+                </h4>
+                {associatedContracts.length > 0 && (
+                  <button
+                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100/90 border border-indigo-200/60 shadow-3xs transition-all duration-150 cursor-pointer active:scale-95"
+                    title={sortOrder === 'asc' ? '当前：流程正序（前期在上）' : '当前：流程倒序（后期在上）'}
+                  >
+                    <ArrowUpDown size={11} className="text-indigo-500" />
+                    <span>{sortOrder === 'asc' ? '流程正序 ↑' : '流程倒序 ↓'}</span>
+                  </button>
+                )}
+              </div>
 
               {associatedContracts.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-6 border border-dashed border-slate-200 rounded-xl bg-white text-center text-slate-400">
                   <span className="text-[10px] font-medium">暂无已订立的合作合同记录</span>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                  {associatedContracts.map(c => {
+                <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+                  {sortedContracts.map(c => {
                     return (
                       <div 
                         key={c.id}
@@ -516,6 +487,7 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

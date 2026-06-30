@@ -153,7 +153,7 @@ export const Suppliers: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center space-x-2">
             <Building2 className="text-blue-500" size={22} />
-            <span>轻量采购关系管理系统 (小型 ERP)</span>
+            <span>供应商</span>
           </h2>
           <p className="text-slate-400 text-xs mt-1">
             供应商、前置需求询比价、后置工作合同在此形成统一的关联追踪网络。支持自由扩展属性、备忘录记录，数据多模块实时同步更新。
@@ -257,18 +257,26 @@ export const Suppliers: React.FC = () => {
                       </button>
                       <div className="flex items-center space-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => handleStartEditCat(cat)}
-                          className="p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleStartEditCat(cat);
+                          }}
+                          className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded cursor-pointer"
                           title="编辑分类"
                         >
-                          <Edit2 size={10} />
+                          <Edit2 size={11} />
                         </button>
                         <button
-                          onClick={() => handleDeleteCat(cat.id)}
-                          className="p-0.5 text-slate-400 hover:text-rose-600 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleDeleteCat(cat.id);
+                          }}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
                           title="删除分类"
                         >
-                          <Trash2 size={10} />
+                          <Trash2 size={11} />
                         </button>
                       </div>
                       <span className="bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-mono text-[9px] group-hover:hidden">{catCount}</span>
