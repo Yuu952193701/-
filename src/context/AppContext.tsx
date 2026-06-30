@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { DemandProject, Contract, WorkflowStep, SHIPS, BackupFile, KnowledgeCategory, KnowledgePage, BidProject, ChecklistTask, RecommendedTag } from '../types';
+import { DemandProject, Contract, WorkflowStep, SHIPS, BackupFile, KnowledgeCategory, KnowledgePage, BidProject, ChecklistTask, RecommendedTag, Supplier, SupplierCategory } from '../types';
 import {
   DEFAULT_PRE_STEPS,
   DEFAULT_POST_STEPS,
@@ -93,6 +93,16 @@ interface AppContextProps {
   systemLogs: string[];
   addSystemLog: (msg: string) => void;
   clearSystemLogs: () => void;
+
+  // Supplier Management
+  suppliers: Supplier[];
+  supplierCategories: SupplierCategory[];
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => Supplier;
+  updateSupplier: (id: string, updates: Partial<Supplier>) => void;
+  deleteSupplier: (id: string) => void;
+  addSupplierCategory: (name: string) => SupplierCategory;
+  updateSupplierCategory: (id: string, name: string) => void;
+  deleteSupplierCategory: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -242,9 +252,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Supplier Categories and Suppliers State
+  const [supplierCategories, setSupplierCategories] = useState<SupplierCategory[]>(() => {
+    const saved = localStorage.getItem('p_workbench_supplier_cats');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: 'cat-sup-1', name: '电力与石化能源' },
+      { id: 'cat-sup-2', name: '船舶备件与装备' },
+      { id: 'cat-sup-3', name: '港口综合服务商' },
+    ];
+  });
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    const saved = localStorage.getItem('p_workbench_suppliers');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: 'sup-1', name: '国能', categoryId: 'cat-sup-1', contact: '张总', phone: '13901012345', email: 'guoneng@energy.com', remark: '大型国有电力供应商，常备备件全', createdAt: new Date().toISOString() },
+      { id: 'sup-2', name: '华电', categoryId: 'cat-sup-1', contact: '李主管', phone: '13812345678', email: 'huadian@hd.com', remark: '高品质能源设备供应商', createdAt: new Date().toISOString() },
+      { id: 'sup-3', name: '中海油', categoryId: 'cat-sup-1', contact: '王经理', phone: '13677778888', email: 'cnooc@cnooc.com', remark: '海上石化主力，油品优良', createdAt: new Date().toISOString() },
+      { id: 'sup-4', name: '上海港丰冠船务', categoryId: 'cat-sup-3', contact: '刘船长', phone: '13599991111', email: 'fengguan@shport.com', remark: '上海本地港口船务代理及物料供应', createdAt: new Date().toISOString() },
+      { id: 'sup-5', name: '佐敦油漆', categoryId: 'cat-sup-2', contact: '陈顾问', phone: '13388889999', email: 'jotun@jotun.com', remark: '进口防腐涂料知名品牌', createdAt: new Date().toISOString() },
+    ];
+  });
+
   // Global Navigation & Page Selection States
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedKnowledgePageId, setSelectedKnowledgePageId] = useState<string | null>(null);
+
+  // Sync supplier categories
+  useEffect(() => {
+    localStorage.setItem('p_workbench_supplier_cats', JSON.stringify(supplierCategories));
+    if (window.electronAPI) {
+      window.electronAPI.saveData('supplierCategories', supplierCategories).catch(err => console.error(err));
+    }
+  }, [supplierCategories]);
+
+  // Sync suppliers
+  useEffect(() => {
+    localStorage.setItem('p_workbench_suppliers', JSON.stringify(suppliers));
+    if (window.electronAPI) {
+      window.electronAPI.saveData('suppliers', suppliers).catch(err => console.error(err));
+    }
+  }, [suppliers]);
 
   // Sync recommendedTags
   useEffect(() => {
@@ -643,6 +692,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (state.allTags) setAllTags(state.allTags);
       if (state.knowledgeCategories) setKnowledgeCategories(state.knowledgeCategories);
       if (state.knowledgePages) setKnowledgePages(state.knowledgePages);
+      if (state.suppliers) setSuppliers(state.suppliers);
+      if (state.supplierCategories) setSupplierCategories(state.supplierCategories);
       
       // Save directly to localStorage
       localStorage.setItem('p_workbench_projects', JSON.stringify(state.projects));
@@ -654,6 +705,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (state.allTags) localStorage.setItem('p_workbench_all_tags', JSON.stringify(state.allTags));
       if (state.knowledgeCategories) localStorage.setItem('p_workbench_k_categories', JSON.stringify(state.knowledgeCategories));
       if (state.knowledgePages) localStorage.setItem('p_workbench_k_pages', JSON.stringify(state.knowledgePages));
+      if (state.suppliers) localStorage.setItem('p_workbench_suppliers', JSON.stringify(state.suppliers));
+      if (state.supplierCategories) localStorage.setItem('p_workbench_supplier_cats', JSON.stringify(state.supplierCategories));
       
       addSystemLog(`[数据重写] 主 SQLite 读写锁卸载，覆盖 app/database/data.db 成功！`);
       addSystemLog(`[内核重载] 重新挂载 SQLite 服务句柄，对前置项目组和合同包重构索引...`);
@@ -682,6 +735,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         allTags,
         knowledgeCategories,
         knowledgePages,
+        suppliers,
+        supplierCategories,
         version: '1.2',
         engine: 'Simulated SQLite Direct Copy',
         exportDate: new Date().toISOString()
@@ -729,6 +784,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (parsed.allTags) setAllTags(parsed.allTags);
       if (parsed.knowledgeCategories) setKnowledgeCategories(parsed.knowledgeCategories);
       if (parsed.knowledgePages) setKnowledgePages(parsed.knowledgePages);
+      if (parsed.suppliers) setSuppliers(parsed.suppliers);
+      if (parsed.supplierCategories) setSupplierCategories(parsed.supplierCategories);
       
       localStorage.setItem('p_workbench_projects', JSON.stringify(parsed.projects));
       localStorage.setItem('p_workbench_contracts', JSON.stringify(parsed.contracts));
@@ -739,6 +796,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (parsed.allTags) localStorage.setItem('p_workbench_all_tags', JSON.stringify(parsed.allTags));
       if (parsed.knowledgeCategories) localStorage.setItem('p_workbench_k_categories', JSON.stringify(parsed.knowledgeCategories));
       if (parsed.knowledgePages) localStorage.setItem('p_workbench_k_pages', JSON.stringify(parsed.knowledgePages));
+      if (parsed.suppliers) localStorage.setItem('p_workbench_suppliers', JSON.stringify(parsed.suppliers));
+      if (parsed.supplierCategories) localStorage.setItem('p_workbench_supplier_cats', JSON.stringify(parsed.supplierCategories));
       
       addSystemLog(`[内核重载] 辅导引擎冷切完成，硬盘上的 data.db 数据流极速对齐重写完毕！`);
       setIsDatabaseConnecting(false);
@@ -1001,7 +1060,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       code: cleanCode,
       name: cleanName,
       ship: projectData.ship,
-      status: defaultStatus,
+      status: projectData.status ?? defaultStatus,
       isUrgent: projectData.isUrgent ?? false,
       dueDate: projectData.dueDate,
       tags: projectData.tags ?? [],
@@ -1220,6 +1279,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPostWorkflow(steps);
   };
 
+  // Supplier Actions Implementation
+  const addSupplier = (sData: Omit<Supplier, 'id' | 'createdAt'>): Supplier => {
+    const id = `sup-${Date.now()}`;
+    const newSup: Supplier = {
+      ...sData,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    setSuppliers(prev => [newSup, ...prev]);
+    addSystemLog(`[供应商管理] 登记新增供应商: ${sData.name}`);
+    return newSup;
+  };
+
+  const updateSupplier = (id: string, updates: Partial<Supplier>) => {
+    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  };
+
+  const deleteSupplier = (id: string) => {
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+    setProjects(prev => prev.map(p => {
+      if (p.inquiries) {
+        return {
+          ...p,
+          inquiries: p.inquiries.filter(inq => inq.supplierId !== id)
+        };
+      }
+      return p;
+    }));
+    addSystemLog(`[供应商管理] 已移除供应商 ID: ${id}`);
+  };
+
+  const addSupplierCategory = (name: string): SupplierCategory => {
+    const id = `cat-sup-${Date.now()}`;
+    const newCat: SupplierCategory = { id, name: name.trim() };
+    setSupplierCategories(prev => [...prev, newCat]);
+    return newCat;
+  };
+
+  const updateSupplierCategory = (id: string, name: string) => {
+    setSupplierCategories(prev => prev.map(c => c.id === id ? { ...c, name: name.trim() } : c));
+  };
+
+  const deleteSupplierCategory = (id: string) => {
+    setSupplierCategories(prev => prev.filter(c => c.id !== id));
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1281,7 +1386,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isDatabaseConnecting,
         systemLogs,
         addSystemLog,
-        clearSystemLogs
+        clearSystemLogs,
+        suppliers,
+        supplierCategories,
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
+        addSupplierCategory,
+        updateSupplierCategory,
+        deleteSupplierCategory
       }}
     >
       {children}

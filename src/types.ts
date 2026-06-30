@@ -6,6 +6,27 @@ export interface WorkflowStep {
   color: ColorState;
 }
 
+export interface ProjectInquiry {
+  supplierId: string;
+  hasQuoted: boolean; // true = 已报价, false = 未报价
+}
+
+export interface SupplierCategory {
+  id: string;
+  name: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  categoryId: string; // references SupplierCategory id
+  contact?: string;
+  phone?: string;
+  email?: string;
+  remark?: string;
+  createdAt: string;
+}
+
 export interface DemandProject {
   id: string; // Internal UUID
   code: string; // 项目编号 (unique-ish)
@@ -20,6 +41,7 @@ export interface DemandProject {
   contractId?: string; // 关联合同ID (Nullable)
   createdAt: string;
   updatedAt: string;
+  inquiries?: ProjectInquiry[]; // 新增：供应商询价矩阵关联
 }
 
 export interface Contract {

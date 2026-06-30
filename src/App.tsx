@@ -8,6 +8,7 @@ import { PostProcurement } from './components/PostProcurement';
 import { Bidding } from './components/Bidding';
 import { KnowledgeLibrary } from './components/KnowledgeLibrary';
 import { Settings } from './components/Settings';
+import { Suppliers } from './components/Suppliers';
 
 function AppInner() {
   const { activeTab, setActiveTab } = useAppState();
@@ -25,6 +26,8 @@ function AppInner() {
         return <PostProcurement />;
       case 'bid':
         return <Bidding />;
+      case 'suppliers':
+        return <Suppliers />;
       case 'knowledge':
         return <KnowledgeLibrary />;
       case 'settings':
@@ -46,6 +49,8 @@ function AppInner() {
         return 'D:\\采购\\后置工作\\合同文件管理\\HH01-2026-015';
       case 'bid':
         return 'D:\\采购\\标书\\BiddingVault.db';
+      case 'suppliers':
+        return 'D:\\采购\\供应商管理\\SuppliersRegistry.db';
       case 'knowledge':
         return 'D:\\采购\\资料库\\KnowledgeBase.db';
       case 'settings':

@@ -26,11 +26,24 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
     addGlobalTag,
     recommendedTags,
     deleteRecommendedTag,
-    associateProjectToContract
+    associateProjectToContract,
+    suppliers,
+    supplierCategories,
+    addSupplier
   } = useAppState();
 
   const [newTag, setNewTag] = useState('');
   const [showTagOptions, setShowTagOptions] = useState(false);
+
+  // Supplier quick-add states
+  const [quickSupName, setQuickSupName] = useState('');
+  const [quickSupCatId, setQuickSupCatId] = useState('');
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+  // Supplier selection and search states
+  const [supSearch, setSupSearch] = useState('');
+  const [supFilterCat, setSupFilterCat] = useState('all');
+  const [showSupplierSelector, setShowSupplierSelector] = useState(false);
 
   // Retrieve item
   const projectItem = type === 'project' ? projects.find(p => p.id === itemId) : undefined;
@@ -123,6 +136,45 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
         onItemIdChange(fields.id);
       }
     }
+  };
+
+  // Inquiry Matrix operations
+  const handleToggleInquiryStatus = (supplierId: string) => {
+    const currentInquiries = projectItem?.inquiries || [];
+    const updatedInquiries = currentInquiries.map(inq => 
+      inq.supplierId === supplierId 
+        ? { ...inq, hasQuoted: !inq.hasQuoted }
+        : inq
+    );
+    handleSaveField({ inquiries: updatedInquiries });
+  };
+
+  const handleAddInquirySupplier = (supplierId: string) => {
+    const currentInquiries = projectItem?.inquiries || [];
+    if (currentInquiries.some(inq => inq.supplierId === supplierId)) return;
+    const updatedInquiries = [
+      ...currentInquiries,
+      { supplierId, hasQuoted: false }
+    ];
+    handleSaveField({ inquiries: updatedInquiries });
+  };
+
+  const handleRemoveInquirySupplier = (supplierId: string) => {
+    const currentInquiries = projectItem?.inquiries || [];
+    const updatedInquiries = currentInquiries.filter(inq => inq.supplierId !== supplierId);
+    handleSaveField({ inquiries: updatedInquiries });
+  };
+
+  const handleQuickAddAndSelect = () => {
+    if (!quickSupName.trim()) return;
+    const catId = quickSupCatId || supplierCategories[0]?.id || '';
+    const newSup = addSupplier({
+      name: quickSupName.trim(),
+      categoryId: catId,
+    });
+    handleAddInquirySupplier(newSup.id);
+    setQuickSupName('');
+    setShowQuickAdd(false);
   };
 
 
@@ -775,42 +827,313 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
 
           {/* Relationships Configuration */}
           {type === 'project' ? (
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
-                已关联合同 (仅能关联同艘船舶的合同)
-              </label>
-              {eligibleContracts.length === 0 ? (
-                <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
-                  当前船舶 <span className="font-bold">{ship}</span> 尚未创建任何合同，无法关联。请先去后置工作模块创建一个属于 {ship} 的合同。
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+                  已关联合同 (仅能关联同艘船舶的合同)
+                </label>
+                {eligibleContracts.length === 0 ? (
+                  <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    当前船舶 <span className="font-bold">{ship}</span> 尚未创建任何合同，无法关联。请先去后置工作模块创建一个属于 {ship} 的合同。
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <select
+                      value={associatedContractId}
+                      onChange={(e) => {
+                        const newId = e.target.value || undefined;
+                        setAssociatedContractId(newId || '');
+                        associateProjectToContract(itemId, newId);
+                      }}
+                      className="w-full p-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-100 focus:outline-none bg-white font-medium"
+                    >
+                      <option value="">-- 未关联任何合同 --</option>
+                      {eligibleContracts.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.status})
+                        </option>
+                      ))}
+                    </select>
+                    {connectedContract && (
+                      <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-xs space-y-1">
+                        <div className="font-medium text-slate-700 flex items-center justify-between">
+                          <span>关联详情：{connectedContract.name}</span>
+                          <span className="text-blue-600 font-semibold">{connectedContract.status}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <hr className="border-slate-100" />
+
+              {/* 供应商区域 */}
+              <div className="space-y-3 bg-slate-50/50 border border-slate-200 rounded-xl p-4">
+                <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
+                    <span>供应商</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-slate-500 font-bold bg-slate-200/50 px-2 py-0.5 rounded">
+                    已选: {projectItem?.inquiries?.length || 0} | 已报价: {projectItem?.inquiries?.filter(i => i.hasQuoted).length || 0}
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <select
-                    value={associatedContractId}
-                    onChange={(e) => {
-                      const newId = e.target.value || undefined;
-                      setAssociatedContractId(newId || '');
-                      associateProjectToContract(itemId, newId);
-                    }}
-                    className="w-full p-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-100 focus:outline-none bg-white font-medium"
-                  >
-                    <option value="">-- 未关联任何合同 --</option>
-                    {eligibleContracts.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.status})
-                      </option>
-                    ))}
-                  </select>
-                  {connectedContract && (
-                    <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-xs space-y-1">
-                      <div className="font-medium text-slate-700 flex items-center justify-between">
-                        <span>关联详情：{connectedContract.name}</span>
-                        <span className="text-blue-600 font-semibold">{connectedContract.status}</span>
+                
+                {/* 询价列表 */}
+                <div className="space-y-1.5">
+                  {(!projectItem?.inquiries || projectItem.inquiries.length === 0) ? (
+                    <div className="text-xs text-slate-400 py-4 text-center border border-dashed border-slate-200 rounded-lg bg-white">
+                      暂无关联的供应商。请在下方搜索选择或快速登记。
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                      {projectItem.inquiries.map(inq => {
+                        const sup = suppliers.find(s => s.id === inq.supplierId);
+                        if (!sup) return null;
+                        const catName = supplierCategories.find(c => c.id === sup.categoryId)?.name || '未分类';
+
+                        return (
+                          <div
+                            key={inq.supplierId}
+                            className="flex items-center justify-between py-2 px-3 text-xs bg-white border border-slate-200 rounded-lg hover:border-blue-300 transition-colors"
+                          >
+                            <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                              {/* 报价状态勾选框 */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleInquiryStatus(inq.supplierId)}
+                                className="h-4.5 w-4.5 rounded border border-slate-300 flex items-center justify-center cursor-pointer transition-colors bg-white hover:border-blue-500 hover:bg-slate-50 flex-shrink-0"
+                              >
+                                {inq.hasQuoted ? (
+                                  <span className="text-blue-600 font-bold text-sm select-none">✓</span>
+                                ) : null}
+                              </button>
+                              
+                              <div className="flex flex-col truncate">
+                                <span className={`font-semibold text-slate-800 truncate ${inq.hasQuoted ? 'line-through text-slate-400' : ''}`}>
+                                  {sup.name}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-medium truncate">
+                                  {catName} {sup.contact ? `| ${sup.contact}` : ''} {sup.phone ? `| ${sup.phone}` : ''}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 flex-shrink-0">
+                              {/* 报价状态快捷标识 */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleInquiryStatus(inq.supplierId)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                                  inq.hasQuoted
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                    : 'bg-amber-50 text-amber-600 border border-amber-100'
+                                }`}
+                              >
+                                {inq.hasQuoted ? '已报价' : '未报价'}
+                              </button>
+
+                              {/* 快速移除关联 */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveInquirySupplier(inq.supplierId)}
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer transition-colors"
+                                title="移除供应商"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 选择与快捷新建 */}
+                <div className="space-y-3 pt-3 border-t border-slate-200">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSupplierSelector(!showSupplierSelector);
+                        setShowQuickAdd(false);
+                      }}
+                      className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border cursor-pointer transition-all flex items-center justify-center space-x-1.5 ${
+                        showSupplierSelector
+                          ? 'bg-blue-50 border-blue-200 text-blue-600'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <span>🔍 选择 / 多选供应商</span>
+                      <span className="bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-mono text-[9px]">{suppliers.length}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowQuickAdd(!showQuickAdd);
+                        setShowSupplierSelector(false);
+                      }}
+                      className={`px-3 py-2 text-xs font-bold rounded-lg border cursor-pointer transition-all ${
+                        showQuickAdd
+                          ? 'bg-blue-50 border-blue-200 text-blue-600'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      ⚡ 快速登记
+                    </button>
+                  </div>
+
+                  {/* 供应商多选与过滤面板 */}
+                  {showSupplierSelector && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-3 animate-fade-in shadow-2xs">
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="搜索供应商名称、分类、联系人..."
+                          value={supSearch}
+                          onChange={(e) => setSupSearch(e.target.value)}
+                          className="w-full pl-7 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white font-semibold"
+                        />
+                        <Search className="absolute left-2.5 top-2.5 text-slate-400" size={12} />
+                        {supSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setSupSearch('')}
+                            className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Category Quick Filter Pills */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                        <button
+                          type="button"
+                          onClick={() => setSupFilterCat('all')}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                            supFilterCat === 'all'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          全部
+                        </button>
+                        {supplierCategories.map(cat => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setSupFilterCat(cat.id)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                              supFilterCat === cat.id
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* List of candidates with Checkboxes */}
+                      <div className="max-h-48 overflow-y-auto space-y-1 pr-1 border border-slate-100 rounded-md p-1 bg-slate-50/50">
+                        {(() => {
+                          const candidates = suppliers.filter(s => {
+                            const matchesSearch = s.name.toLowerCase().includes(supSearch.toLowerCase()) ||
+                              (s.remark || '').toLowerCase().includes(supSearch.toLowerCase()) ||
+                              (s.contact || '').toLowerCase().includes(supSearch.toLowerCase());
+                            const matchesCat = supFilterCat === 'all' || s.categoryId === supFilterCat;
+                            return matchesSearch && matchesCat;
+                          });
+
+                          if (candidates.length === 0) {
+                            return (
+                              <div className="text-[11px] text-slate-400 py-4 text-center">
+                                未匹配到相关供应商
+                              </div>
+                            );
+                          }
+
+                          return candidates.map(s => {
+                            const isSelected = projectItem?.inquiries?.some(inq => inq.supplierId === s.id) || false;
+                            const catName = supplierCategories.find(c => c.id === s.categoryId)?.name || '未分类';
+
+                            return (
+                              <label
+                                key={s.id}
+                                className={`flex items-start space-x-2 p-2 rounded-md hover:bg-white border transition-all cursor-pointer ${
+                                  isSelected ? 'bg-blue-50/40 border-blue-200/60' : 'bg-transparent border-transparent'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    if (isSelected) {
+                                      handleRemoveInquirySupplier(s.id);
+                                    } else {
+                                      handleAddInquirySupplier(s.id);
+                                    }
+                                  }}
+                                  className="mt-0.5 h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer"
+                                />
+                                <div className="flex flex-col text-[11px] min-w-0">
+                                  <span className={`font-semibold text-slate-800 ${isSelected ? 'text-blue-700' : ''}`}>
+                                    {s.name}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 truncate">
+                                    分类: {catName} {s.contact ? `| 联系人: ${s.contact}` : ''}
+                                  </span>
+                                </div>
+                              </label>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 快捷新建输入表单 */}
+                  {showQuickAdd && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 animate-fade-in shadow-2xs">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        快捷录入并立即加入：
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="供应商名称 (必填)..."
+                          value={quickSupName}
+                          onChange={(e) => setQuickSupName(e.target.value)}
+                          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-semibold"
+                        />
+                        <select
+                          value={quickSupCatId}
+                          onChange={(e) => setQuickSupCatId(e.target.value)}
+                          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 text-slate-700"
+                        >
+                          <option value="">选择所属分类...</option>
+                          {supplierCategories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="button"
+                          onClick={handleQuickAddAndSelect}
+                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded cursor-pointer shadow-xs transition-transform active:scale-95"
+                        >
+                          保存并立即选中
+                        </button>
                       </div>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
           ) : type === 'bid' ? (
             <div>

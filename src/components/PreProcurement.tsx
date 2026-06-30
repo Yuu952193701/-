@@ -31,6 +31,7 @@ export const PreProcurement: React.FC = () => {
   const [newProjectCode, setNewProjectCode] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectShip, setNewProjectShip] = useState('鸿鹄01');
+  const [newProjectStatus, setNewProjectStatus] = useState('');
 
   // Helper to resolve color of a project status
   const getProjectStatusColor = (statusName: string) => {
@@ -59,12 +60,14 @@ export const PreProcurement: React.FC = () => {
       code: newProjectCode.trim(),
       name: newProjectName.trim(),
       ship: newProjectShip,
+      status: newProjectStatus || preWorkflow[0]?.name || '需求单',
     });
 
     // Reset Form
     setNewProjectCode('');
     setNewProjectName('');
     setNewProjectShip('鸿鹄01');
+    setNewProjectStatus('');
     setShowCreateModal(false);
   };
 
@@ -457,10 +460,27 @@ export const PreProcurement: React.FC = () => {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                  当前业务状态 (流转节点)
+                </label>
+                <select
+                  value={newProjectStatus || (preWorkflow[0]?.name || '')}
+                  onChange={(e) => setNewProjectStatus(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none bg-white font-medium text-slate-700"
+                >
+                  {preWorkflow.map(step => (
+                    <option key={step.name} value={step.name}>
+                      {step.color === 'yellow' ? '🟡' : step.color === 'green' ? '🟢' : step.color === 'blue' ? '🔵' : step.color === 'red' ? '🔴' : '⚪'} {step.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="bg-slate-50 border border-slate-150 p-2.5 rounded-md text-[11px] text-slate-400 leading-relaxed font-sans mt-2">
-                <strong>💡 智能默认配置：</strong>
+                <strong>💡 智能配置提示：</strong>
                 <p className="mt-1">
-                  该前置项目创建后，自动处于<b>【{preWorkflow[0]?.name || '需求单'}】</b>阶段。您后续可进入项目详情添加标签、绑定合同或编辑备注信息。
+                  该前置项目创建后，将直接处于您选择的<b>【{newProjectStatus || preWorkflow[0]?.name || '需求单'}】</b>阶段。您后续可进入项目详情添加标签、绑定合同或编辑备注信息。
                 </p>
               </div>
 
