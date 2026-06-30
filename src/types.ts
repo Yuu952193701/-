@@ -16,6 +16,20 @@ export interface SupplierCategory {
   name: string;
 }
 
+export interface SupplierContact {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  role?: string;
+}
+
+export interface SupplierCustomAttr {
+  id: string;
+  key: string;
+  value: string;
+}
+
 export interface Supplier {
   id: string;
   name: string;
@@ -25,6 +39,9 @@ export interface Supplier {
   email?: string;
   remark?: string;
   createdAt: string;
+  contacts?: SupplierContact[];
+  customAttributes?: SupplierCustomAttr[];
+  notes?: string; // 备忘录
 }
 
 export interface DemandProject {
@@ -63,6 +80,8 @@ export interface Contract {
   // 新增：多次结算开关和批次列表
   isMultiSettlement?: boolean;
   settlements?: SettlementBatch[];
+  supplierId?: string; // 关联的供应商ID (对应公司)
+  amount?: string; // 合同金额
 }
 
 export interface SettlementBatch {

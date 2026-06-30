@@ -1323,6 +1323,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteSupplierCategory = (id: string) => {
     setSupplierCategories(prev => prev.filter(c => c.id !== id));
+    setSuppliers(prev => prev.map(s => s.categoryId === id ? { ...s, categoryId: '' } : s));
   };
 
   return (

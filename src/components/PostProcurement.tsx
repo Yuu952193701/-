@@ -17,7 +17,8 @@ export const PostProcurement: React.FC = () => {
     batchAssociateProjects,
     recommendedTags,
     deleteRecommendedTag,
-    addGlobalTag
+    addGlobalTag,
+    suppliers
   } = useAppState();
 
   // Search & Filter States
@@ -403,6 +404,7 @@ export const PostProcurement: React.FC = () => {
 
               // Resolve demand projects linked to this contract
               const assignedDemandProjects = projects.filter(p => p.contractId === contract.id);
+              const contractSupplier = suppliers.find(s => s.id === contract.supplierId);
 
               return (
                 <div
@@ -429,17 +431,6 @@ export const PostProcurement: React.FC = () => {
                           💼 包含 {assignedDemandProjects.length} 笔前置需求
                         </span>
                       )}
-
-                      {/* Overall independent contractStatus badge */}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
-                        (contract.contractStatus || '执行中') === '已完成'
-                          ? 'bg-blue-100 text-blue-800 border-blue-200'
-                          : (contract.contractStatus || '执行中') === '已终止'
-                          ? 'bg-rose-100 text-rose-850 border-rose-250'
-                          : 'bg-amber-100 text-amber-800 border-amber-250'
-                      }`}>
-                        {contract.contractStatus === '已完成' ? '🔵' : (contract.contractStatus === '已终止' ? '🔴' : '🟡')} {contract.contractStatus || '执行中'}
-                      </span>
                     </div>
 
                     {/* PRD Prescribed Horizontal tags display layout:
@@ -470,6 +461,20 @@ export const PostProcurement: React.FC = () => {
                       ) : (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-3xs">
                           🔄 多批结算 ({contract.settlements?.length || 0} 期次)
+                        </span>
+                      )}
+
+                      {/* Contract Amount */}
+                      {contract.amount && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-3xs">
+                          {contract.amount}
+                        </span>
+                      )}
+
+                      {/* Bound Company */}
+                      {contractSupplier && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-3xs">
+                          {contractSupplier.name}
                         </span>
                       )}
 

@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { useAppState } from '../context/AppContext';
 import { Supplier, SupplierCategory } from '../types';
-import { Plus, Edit2, Trash2, FolderPlus, Search, User, Phone, Mail, Building2, Tag, X, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderPlus, Search, Building2, Tag, X, ExternalLink, HelpCircle } from 'lucide-react';
+import { SupplierDetailsModal } from './SupplierDetailsModal';
+import { ItemDetailsModal } from './ItemDetailsModal';
 
 export const Suppliers: React.FC = () => {
   const {
     suppliers,
     supplierCategories,
     addSupplier,
-    updateSupplier,
     deleteSupplier,
     addSupplierCategory,
     updateSupplierCategory,
     deleteSupplierCategory,
+    projects,
+    contracts,
   } = useAppState();
 
   // Search & Filter state
@@ -24,25 +27,30 @@ export const Suppliers: React.FC = () => {
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editingCatName, setEditingCatName] = useState('');
 
-  // New/Edit Supplier States
-  const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [supName, setSupName] = useState('');
-  const [supCatId, setSupCatId] = useState('');
-  const [supContact, setSupContact] = useState('');
-  const [supPhone, setSupPhone] = useState('');
-  const [supEmail, setSupEmail] = useState('');
-  const [supRemark, setSupRemark] = useState('');
+  // New Supplier Dialog states (for quick initial registration)
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newSupName, setNewSupName] = useState('');
+  const [newSupCatId, setNewSupCatId] = useState('');
+
+  // Selected supplier for detail view/edit modal
+  const [selectedSupplierIdForModal, setSelectedSupplierIdForModal] = useState<string | null>(null);
+
+  // Sub-detail trace modal states (opening a project or contract from within the supplier sheet)
+  const [traceItemId, setTraceItemId] = useState<string | null>(null);
+  const [traceItemType, setTraceItemType] = useState<'project' | 'contract' | null>(null);
 
   // Filter suppliers
   const filteredSuppliers = suppliers.filter(s => {
+    // Search by name, custom attributes, or notes
     const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (s.notes || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (s.remark || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.contact || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (s.phone || '').toLowerCase().includes(searchQuery.toLowerCase());
+      s.contacts?.some(c => 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (c.phone || '').toLowerCase().includes(searchQuery.toLowerCase())
+      );
     
     const matchesCat = selectedCatId === 'all' || s.categoryId === selectedCatId;
-    
     return matchesSearch && matchesCat;
   });
 
@@ -67,7 +75,13 @@ export const Suppliers: React.FC = () => {
   };
 
   const handleDeleteCat = (catId: string) => {
-    if (window.confirm('确定要删除该分类吗？关联的供应商将保持原状态。')) {
+    // Find how many suppliers are currently in this category
+    const affectedCount = suppliers.filter(s => s.categoryId === catId).length;
+    let message = '确定要删除该分类吗？';
+    if (affectedCount > 0) {
+      message = `确定要删除该分类吗？当前有 ${affectedCount} 家供应商属于此分类，删除后这些供应商将自动设为「未分类」状态。`;
+    }
+    if (window.confirm(message)) {
       deleteSupplierCategory(catId);
       if (selectedCatId === catId) {
         setSelectedCatId('all');
@@ -75,56 +89,58 @@ export const Suppliers: React.FC = () => {
     }
   };
 
-  // Handle supplier management
+  // Handle supplier addition
   const handleOpenAddModal = () => {
-    setEditingSupplier(null);
-    setSupName('');
-    setSupCatId(supplierCategories[0]?.id || '');
-    setSupContact('');
-    setSupPhone('');
-    setSupEmail('');
-    setSupRemark('');
-    setShowSupplierModal(true);
+    setNewSupName('');
+    setNewSupCatId(supplierCategories[0]?.id || '');
+    setShowAddModal(true);
   };
 
-  const handleOpenEditModal = (sup: Supplier) => {
-    setEditingSupplier(sup);
-    setSupName(sup.name);
-    setSupCatId(sup.categoryId);
-    setSupContact(sup.contact || '');
-    setSupPhone(sup.phone || '');
-    setSupEmail(sup.email || '');
-    setSupRemark(sup.remark || '');
-    setShowSupplierModal(true);
-  };
-
-  const handleSaveSupplier = (e: React.FormEvent) => {
+  const handleCreateSupplier = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supName.trim()) {
+    if (!newSupName.trim()) {
       alert('请输入供应商名称');
       return;
     }
 
-    const supplierData = {
-      name: supName.trim(),
-      categoryId: supCatId,
-      contact: supContact.trim() || undefined,
-      phone: supPhone.trim() || undefined,
-      email: supEmail.trim() || undefined,
-      remark: supRemark.trim() || undefined,
-    };
+    const created = addSupplier({
+      name: newSupName.trim(),
+      categoryId: newSupCatId,
+    });
 
-    if (editingSupplier) {
-      updateSupplier(editingSupplier.id, supplierData);
-    } else {
-      addSupplier(supplierData);
-    }
-
-    setShowSupplierModal(false);
+    setShowAddModal(false);
+    // Immediately open the details editor sheet for this newly registered supplier so they can freely extend contacts, custom info, or document notes!
+    setSelectedSupplierIdForModal(created.id);
   };
 
-  const handleDeleteSupplier = (id: string, name: string) => {
-    if (window.confirm(`确定要删除供应商「${name}」吗？该删除不会影响历史已生成的合同。`)) {
+  // Delete supplier with detailed relationship impact warning
+  const handleDeleteSupplier = (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation(); // Avoid triggering open modal on card click
+
+    const associatedProjCount = projects.filter(p => 
+      p.inquiries?.some(inq => inq.supplierId === id)
+    ).length;
+
+    const associatedContCount = contracts.filter(c => 
+      c.supplierId === id
+    ).length;
+
+    let warningMessage = `您确定要删除供应商「${name}」吗？\n\n`;
+    
+    if (associatedProjCount > 0 || associatedContCount > 0) {
+      warningMessage += `⚠️ 影响范围警告 (统一关系数据库校验)：\n`;
+      if (associatedProjCount > 0) {
+        warningMessage += `• 该供应商正参与 ${associatedProjCount} 个前置需求工作的询报价，删除将自动解除关联；\n`;
+      }
+      if (associatedContCount > 0) {
+        warningMessage += `• 该供应商已绑定 ${associatedContCount} 个后置工作合同，删除将自动清空其主供应商标识；\n`;
+      }
+      warningMessage += `\n此删除操作不可逆，建议保留并在备忘录中备注「停止合作」。是否坚持删除？`;
+    } else {
+      warningMessage += `此操作不可逆，是否确认删除该供应商？`;
+    }
+
+    if (window.confirm(warningMessage)) {
       deleteSupplier(id);
     }
   };
@@ -137,10 +153,10 @@ export const Suppliers: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center space-x-2">
             <Building2 className="text-blue-500" size={22} />
-            <span>供应商管理中心</span>
+            <span>轻量采购关系管理系统 (小型 ERP)</span>
           </h2>
           <p className="text-slate-400 text-xs mt-1">
-            维护采购询价相关的合作商、供应商主数据。可在此进行供应商资质、分类管理，与前置需求端询价矩阵无缝打通。
+            供应商、前置需求询比价、后置工作合同在此形成统一的关联追踪网络。支持自由扩展属性、备忘录记录，数据多模块实时同步更新。
           </p>
         </div>
         <button
@@ -274,7 +290,7 @@ export const Suppliers: React.FC = () => {
             <div className="relative w-full md:max-w-md">
               <input
                 type="text"
-                placeholder="搜索供应商名称、联系人、电话、备注描述..."
+                placeholder="搜索公司名称、备忘录 notes、联系人..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-4 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white font-medium"
@@ -297,7 +313,7 @@ export const Suppliers: React.FC = () => {
             </div>
           </div>
 
-          {/* Supplier Cards Grid */}
+          {/* Supplier Cards Grid - High visual hierarchy & minimal info */}
           {filteredSuppliers.length === 0 ? (
             <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center text-slate-400 shadow-2xs">
               <Building2 className="mx-auto text-slate-300 mb-2" size={32} />
@@ -305,37 +321,35 @@ export const Suppliers: React.FC = () => {
               <p className="text-xs text-slate-400 mt-1">您可以通过上方“登记新供应商”按钮为该分类增加实体供应商。</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredSuppliers.map(sup => {
                 const categoryName = supplierCategories.find(c => c.id === sup.categoryId)?.name || '未分类';
+                
+                // Track associated metrics
+                const projCount = projects.filter(p => p.inquiries?.some(inq => inq.supplierId === sup.id)).length;
+                const contCount = contracts.filter(c => c.supplierId === sup.id).length;
 
                 return (
                   <div
                     key={sup.id}
-                    className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-2xs hover:shadow-xs hover:border-blue-200 transition-all flex flex-col justify-between group"
+                    onClick={() => setSelectedSupplierIdForModal(sup.id)}
+                    className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-2xs hover:shadow-md hover:border-blue-500 hover:translate-y-[-1px] transition-all cursor-pointer flex flex-col justify-between group h-36"
+                    id={`sup-card-${sup.id}`}
                   >
-                    <div className="space-y-3">
-                      
+                    <div>
                       {/* Name & Action Menu */}
                       <div className="flex justify-between items-start gap-2">
-                        <div>
-                          <h3 className="font-semibold text-slate-800 text-sm tracking-tight truncate max-w-[200px]" title={sup.name}>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-slate-800 text-sm tracking-tight truncate group-hover:text-blue-600 transition-colors" title={sup.name}>
                             {sup.name}
                           </h3>
-                          <span className="inline-block bg-blue-50 text-blue-600 text-[9px] font-bold px-1.5 py-0.2 rounded-sm mt-1">
+                          <span className="inline-block bg-slate-100 text-slate-500 text-[9px] font-bold px-1.5 py-0.2 rounded-sm mt-1">
                             {categoryName}
                           </span>
                         </div>
                         <div className="flex items-center space-x-1 bg-slate-50 border border-slate-100 rounded px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => handleOpenEditModal(sup)}
-                            className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors cursor-pointer"
-                            title="修改"
-                          >
-                            <Edit2 size={11} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSupplier(sup.id, sup.name)}
+                            onClick={(e) => handleDeleteSupplier(e, sup.id, sup.name)}
                             className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors cursor-pointer"
                             title="删除"
                           >
@@ -343,36 +357,33 @@ export const Suppliers: React.FC = () => {
                           </button>
                         </div>
                       </div>
-
-                      {/* Contact Channels */}
-                      <div className="space-y-1.5 text-xs text-slate-600 font-medium">
-                        <div className="flex items-center space-x-2">
-                          <User size={12} className="text-slate-400" />
-                          <span>联系人: <span className="text-slate-800">{sup.contact || '--'}</span></span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Phone size={12} className="text-slate-400" />
-                          <span>电话: <span className="text-slate-800 font-mono">{sup.phone || '--'}</span></span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Mail size={12} className="text-slate-400" />
-                          <span>邮箱: <span className="text-slate-800 font-mono">{sup.email || '--'}</span></span>
-                        </div>
-                      </div>
-
-                      {/* Remark details */}
-                      {sup.remark && (
-                        <div className="bg-slate-50 border border-slate-100/60 rounded-lg p-2.5 text-[11px] text-slate-500 leading-relaxed flex items-start space-x-1.5">
-                          <FileText size={12} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                          <span className="line-clamp-2" title={sup.remark}>{sup.remark}</span>
-                        </div>
-                      )}
-
                     </div>
 
-                    <div className="border-t border-slate-100 mt-4 pt-2 flex justify-between items-center text-[10px] text-slate-400 font-mono">
-                      <span>已注册</span>
-                      <span>{new Date(sup.createdAt).toLocaleDateString()}</span>
+                    {/* Integrated mini relationship tag in card bottom */}
+                    <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                      <div className="flex items-center space-x-2">
+                        {(projCount > 0 || contCount > 0) ? (
+                          <>
+                            {projCount > 0 && (
+                              <span className="bg-teal-50 text-teal-700 font-semibold px-1.5 py-0.2 rounded">
+                                需求询价: {projCount}
+                              </span>
+                            )}
+                            {contCount > 0 && (
+                              <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.2 rounded">
+                                合作合同: {contCount}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-slate-300">无合作记录</span>
+                        )}
+                      </div>
+                      
+                      <span className="text-blue-500 font-semibold group-hover:underline flex items-center space-x-0.5">
+                        <span>详情页</span>
+                        <ExternalLink size={9} />
+                      </span>
                     </div>
 
                   </div>
@@ -385,110 +396,55 @@ export const Suppliers: React.FC = () => {
 
       </div>
 
-      {/* Slide-over Form Modal for Adding / Editing Suppliers */}
-      {showSupplierModal && (
+      {/* Quick Registration Dialog */}
+      {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-fade-in">
             
-            {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h3 className="text-sm font-bold text-slate-800">
-                {editingSupplier ? '编辑供应商信息' : '登记新供应商商企'}
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                登记新供应商 (快速初始化)
               </h3>
               <button
-                onClick={() => setShowSupplierModal(false)}
+                onClick={() => setShowAddModal(false)}
                 className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Modal Body Form */}
-            <form onSubmit={handleSaveSupplier}>
+            <form onSubmit={handleCreateSupplier}>
               <div className="p-6 space-y-4">
-                
-                {/* Name */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-500">供应商名称 <span className="text-rose-500">*</span></label>
+                  <label className="block text-xs font-bold text-slate-500">公司/供应商名称 <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
                     required
-                    value={supName}
-                    onChange={(e) => setSupName(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-medium"
-                    placeholder="例如: 上海港机油服务总公司"
+                    value={newSupName}
+                    onChange={(e) => setNewSupName(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-semibold"
+                    placeholder="请输入完整的企业工商名称..."
                   />
                 </div>
 
-                {/* Category Selector */}
                 <div className="space-y-1">
                   <label className="block text-xs font-bold text-slate-500">所属行业分类 <span className="text-rose-500">*</span></label>
                   <select
-                    value={supCatId}
-                    onChange={(e) => setSupCatId(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-medium"
+                    value={newSupCatId}
+                    onChange={(e) => setNewSupCatId(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-semibold cursor-pointer"
                   >
                     {supplierCategories.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
-
-                {/* Contacts grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-500">业务联系人</label>
-                    <input
-                      type="text"
-                      value={supContact}
-                      onChange={(e) => setSupContact(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-medium"
-                      placeholder="张总"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-500">联系电话</label>
-                    <input
-                      type="text"
-                      value={supPhone}
-                      onChange={(e) => setSupPhone(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-mono font-medium"
-                      placeholder="139-0000-0000"
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-500">商务邮箱</label>
-                  <input
-                    type="email"
-                    value={supEmail}
-                    onChange={(e) => setSupEmail(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-mono font-medium"
-                    placeholder="sales@example.com"
-                  />
-                </div>
-
-                {/* Remark Text area */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-500">详细资质及经营范围备注</label>
-                  <textarea
-                    rows={3}
-                    value={supRemark}
-                    onChange={(e) => setSupRemark(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-100 focus:outline-none focus:border-blue-500 font-medium"
-                    placeholder="例如：主营上海港、太仓港燃润油物料保供，资质齐全，结算账期3个月..."
-                  />
-                </div>
-
               </div>
 
-              {/* Modal Footer */}
               <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 flex items-center justify-end space-x-2">
                 <button
                   type="button"
-                  onClick={() => setShowSupplierModal(false)}
+                  onClick={() => setShowAddModal(false)}
                   className="px-4 py-2 text-xs bg-white hover:bg-slate-50 text-slate-600 font-medium rounded-lg border border-slate-200 cursor-pointer"
                 >
                   取消
@@ -497,14 +453,42 @@ export const Suppliers: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm cursor-pointer"
                 >
-                  确认保存
+                  确认并完善详情
                 </button>
               </div>
-
             </form>
 
           </div>
         </div>
+      )}
+
+      {/* Full-Feature Supplier Detail Sheet Modal (备忘录/无限联系人/自定义字段/双向关联可追溯) */}
+      {selectedSupplierIdForModal && (
+        <SupplierDetailsModal
+          supplierId={selectedSupplierIdForModal}
+          onClose={() => setSelectedSupplierIdForModal(null)}
+          onOpenProject={(id) => {
+            setTraceItemId(id);
+            setTraceItemType('project');
+          }}
+          onOpenContract={(id) => {
+            setTraceItemId(id);
+            setTraceItemType('contract');
+          }}
+        />
+      )}
+
+      {/* Trace Item Drawer overlay from Supplier connections */}
+      {traceItemId && traceItemType && (
+        <ItemDetailsModal
+          itemId={traceItemId}
+          type={traceItemType}
+          onClose={() => {
+            setTraceItemId(null);
+            setTraceItemType(null);
+          }}
+          onItemIdChange={(id) => setTraceItemId(id)}
+        />
       )}
 
     </div>

@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       {/* Footer metadata details */}
       <div className="p-4 border-t border-slate-800 bg-[#0B0F19] text-[10px] text-slate-500 font-mono flex flex-col space-y-1">
         <p className="flex items-center space-x-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           <span className="font-semibold text-slate-400">单人助理 (Local DB)</span>
         </p>
         <p>数据已自动保存至本地缓存 (LocalStorage)</p>
