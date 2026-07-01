@@ -3,6 +3,7 @@ import { DemandProject, Contract, WorkflowStep, SHIPS, BackupFile, KnowledgeCate
 import {
   DEFAULT_PRE_STEPS,
   DEFAULT_POST_STEPS,
+  DEFAULT_POST_SERVICE_STEPS,
   DEFAULT_BID_STEPS,
   INITIAL_DEMAND_PROJECTS,
   INITIAL_CONTRACTS,
@@ -16,6 +17,7 @@ interface AppContextProps {
   contracts: Contract[];
   preWorkflow: WorkflowStep[];
   postWorkflow: WorkflowStep[];
+  postServiceWorkflow: WorkflowStep[];
   bids: BidProject[];
   bidWorkflow: WorkflowStep[];
   
@@ -56,6 +58,7 @@ interface AppContextProps {
   // Workflow Actions
   updatePreWorkflow: (steps: WorkflowStep[]) => void;
   updatePostWorkflow: (steps: WorkflowStep[]) => void;
+  updatePostServiceWorkflow: (steps: WorkflowStep[]) => void;
   updateBidWorkflow: (steps: WorkflowStep[]) => void;
   
   // Global Tags catalog for autocomplete suggestion
@@ -128,6 +131,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return parsed;
     }
     return DEFAULT_POST_STEPS;
+  });
+
+  const [postServiceWorkflow, setPostServiceWorkflow] = useState<WorkflowStep[]>(() => {
+    const saved = localStorage.getItem('p_workbench_post_svc_wf');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return parsed;
+    }
+    return DEFAULT_POST_SERVICE_STEPS;
   });
 
   const [contracts, setContracts] = useState<Contract[]>(() => {
@@ -428,6 +440,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (loaded.contracts) setContracts(loaded.contracts);
             if (loaded.preWorkflow) setPreWorkflow(loaded.preWorkflow);
             if (loaded.postWorkflow) setPostWorkflow(loaded.postWorkflow);
+            if (loaded.postServiceWorkflow) setPostServiceWorkflow(loaded.postServiceWorkflow);
             if (loaded.bids) setBids(loaded.bids);
             if (loaded.bidWorkflow) setBidWorkflow(loaded.bidWorkflow);
             if (loaded.allTags) setAllTags(loaded.allTags);
@@ -472,6 +485,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             contracts,
             preWorkflow,
             postWorkflow,
+            postServiceWorkflow,
             bids,
             bidWorkflow,
             allTags,
@@ -515,6 +529,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contracts,
         preWorkflow,
         postWorkflow,
+        postServiceWorkflow,
         bids,
         bidWorkflow,
         allTags,
@@ -550,7 +565,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [projects, contracts, preWorkflow, postWorkflow, bids, bidWorkflow, allTags, knowledgeCategories, knowledgePages]);
+  }, [projects, contracts, preWorkflow, postWorkflow, postServiceWorkflow, bids, bidWorkflow, allTags, knowledgeCategories, knowledgePages]);
 
   const createBackup = async (type: 'auto' | 'manual'): Promise<{ success: boolean; filename: string; error?: string }> => {
     if (window.electronAPI) {
@@ -587,6 +602,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contracts,
         preWorkflow,
         postWorkflow,
+        postServiceWorkflow,
         bids,
         bidWorkflow,
         allTags,
@@ -647,6 +663,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (loaded.contracts) setContracts(loaded.contracts);
           if (loaded.preWorkflow) setPreWorkflow(loaded.preWorkflow);
           if (loaded.postWorkflow) setPostWorkflow(loaded.postWorkflow);
+          if (loaded.postServiceWorkflow) setPostServiceWorkflow(loaded.postServiceWorkflow);
           if (loaded.bids) setBids(loaded.bids);
           if (loaded.bidWorkflow) setBidWorkflow(loaded.bidWorkflow);
           if (loaded.allTags) setAllTags(loaded.allTags);
@@ -688,6 +705,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setBids(state.bids || []);
       if (state.preWorkflow) setPreWorkflow(state.preWorkflow);
       if (state.postWorkflow) setPostWorkflow(state.postWorkflow);
+      if (state.postServiceWorkflow) setPostServiceWorkflow(state.postServiceWorkflow);
       if (state.bidWorkflow) setBidWorkflow(state.bidWorkflow);
       if (state.allTags) setAllTags(state.allTags);
       if (state.knowledgeCategories) setKnowledgeCategories(state.knowledgeCategories);
@@ -701,6 +719,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('p_workbench_bids', JSON.stringify(state.bids || []));
       if (state.preWorkflow) localStorage.setItem('p_workbench_pre_wf', JSON.stringify(state.preWorkflow));
       if (state.postWorkflow) localStorage.setItem('p_workbench_post_wf', JSON.stringify(state.postWorkflow));
+      if (state.postServiceWorkflow) localStorage.setItem('p_workbench_post_svc_wf', JSON.stringify(state.postServiceWorkflow));
       if (state.bidWorkflow) localStorage.setItem('p_workbench_bid_wf', JSON.stringify(state.bidWorkflow));
       if (state.allTags) localStorage.setItem('p_workbench_all_tags', JSON.stringify(state.allTags));
       if (state.knowledgeCategories) localStorage.setItem('p_workbench_k_categories', JSON.stringify(state.knowledgeCategories));
@@ -730,6 +749,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contracts,
         preWorkflow,
         postWorkflow,
+        postServiceWorkflow,
         bids,
         bidWorkflow,
         allTags,
@@ -780,6 +800,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setBids(parsed.bids || []);
       if (parsed.preWorkflow) setPreWorkflow(parsed.preWorkflow);
       if (parsed.postWorkflow) setPostWorkflow(parsed.postWorkflow);
+      if (parsed.postServiceWorkflow) setPostServiceWorkflow(parsed.postServiceWorkflow);
       if (parsed.bidWorkflow) setBidWorkflow(parsed.bidWorkflow);
       if (parsed.allTags) setAllTags(parsed.allTags);
       if (parsed.knowledgeCategories) setKnowledgeCategories(parsed.knowledgeCategories);
@@ -792,6 +813,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('p_workbench_bids', JSON.stringify(parsed.bids || []));
       if (parsed.preWorkflow) localStorage.setItem('p_workbench_pre_wf', JSON.stringify(parsed.preWorkflow));
       if (parsed.postWorkflow) localStorage.setItem('p_workbench_post_wf', JSON.stringify(parsed.postWorkflow));
+      if (parsed.postServiceWorkflow) localStorage.setItem('p_workbench_post_svc_wf', JSON.stringify(parsed.postServiceWorkflow));
       if (parsed.bidWorkflow) localStorage.setItem('p_workbench_bid_wf', JSON.stringify(parsed.bidWorkflow));
       if (parsed.allTags) localStorage.setItem('p_workbench_all_tags', JSON.stringify(parsed.allTags));
       if (parsed.knowledgeCategories) localStorage.setItem('p_workbench_k_categories', JSON.stringify(parsed.knowledgeCategories));
@@ -829,6 +851,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('p_workbench_post_wf', JSON.stringify(postWorkflow));
     if (window.electronAPI) window.electronAPI.saveData('postWorkflow', postWorkflow).catch(err => console.error(err));
   }, [postWorkflow]);
+
+  useEffect(() => {
+    localStorage.setItem('p_workbench_post_svc_wf', JSON.stringify(postServiceWorkflow));
+    if (window.electronAPI) window.electronAPI.saveData('postServiceWorkflow', postServiceWorkflow).catch(err => console.error(err));
+  }, [postServiceWorkflow]);
 
   useEffect(() => {
     localStorage.setItem('p_workbench_bids', JSON.stringify(bids));
@@ -1123,7 +1150,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Create Contract
   const addContract = (contractData: Partial<Contract> & { name: string; ship: string }) => {
-    const defaultStatus = postWorkflow[0]?.name || '签收单';
+    const isService = contractData.contractType === 'service';
+    const defaultStatus = isService
+      ? (postServiceWorkflow[0]?.name || '合同起草')
+      : (postWorkflow[0]?.name || '签收单');
     const cleanName = contractData.name.trim();
     // Default Contract Code is same as name or a unique logic derived
     const cleanCode = contractData.code?.trim() || cleanName;
@@ -1144,7 +1174,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isMultiSettlement: false,
       settlements: [],
       amount: contractData.amount,
-      supplierId: contractData.supplierId
+      supplierId: contractData.supplierId,
+      contractType: contractData.contractType || 'purchase'
     };
 
     setContracts(prev => [newContract, ...prev]);
@@ -1183,19 +1214,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const moveContractStep = (id: string, direction: 'next' | 'prev') => {
     setContracts(prev => prev.map(c => {
       if (c.id === id) {
+        const currentWorkflow = c.contractType === 'service' ? postServiceWorkflow : postWorkflow;
+
         if (c.isMultiSettlement && c.settlements && c.settlements.length > 0) {
           const updatedSettlements = c.settlements.map((batch, index) => {
             if (index === c.settlements!.length - 1) { // Apply to the latest batch
-              const currentIndex = postWorkflow.findIndex(step => step.name === batch.status);
+              const currentIndex = currentWorkflow.findIndex(step => step.name === batch.status);
               if (currentIndex !== -1) {
                 let nextIndex = currentIndex;
-                if (direction === 'next' && currentIndex < postWorkflow.length - 1) {
+                if (direction === 'next' && currentIndex < currentWorkflow.length - 1) {
                   nextIndex = currentIndex + 1;
                 } else if (direction === 'prev' && currentIndex > 0) {
                   nextIndex = currentIndex - 1;
                 }
                 if (nextIndex !== currentIndex) {
-                  return { ...batch, status: postWorkflow[nextIndex].name };
+                  return { ...batch, status: currentWorkflow[nextIndex].name };
                 }
               }
             }
@@ -1208,11 +1241,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
 
-        const currentIndex = postWorkflow.findIndex(step => step.name === c.status);
+        const currentIndex = currentWorkflow.findIndex(step => step.name === c.status);
         if (currentIndex === -1) return c;
 
         let nextIndex = currentIndex;
-        if (direction === 'next' && currentIndex < postWorkflow.length - 1) {
+        if (direction === 'next' && currentIndex < currentWorkflow.length - 1) {
           nextIndex = currentIndex + 1;
         } else if (direction === 'prev' && currentIndex > 0) {
           nextIndex = currentIndex - 1;
@@ -1221,7 +1254,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (nextIndex !== currentIndex) {
           return {
             ...c,
-            status: postWorkflow[nextIndex].name,
+            status: currentWorkflow[nextIndex].name,
             updatedAt: new Date().toISOString()
           };
         }
@@ -1281,6 +1314,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPostWorkflow(steps);
   };
 
+  const updatePostServiceWorkflow = (steps: WorkflowStep[]) => {
+    setPostServiceWorkflow(steps);
+  };
+
   // Supplier Actions Implementation
   const addSupplier = (sData: Omit<Supplier, 'id' | 'createdAt'>): Supplier => {
     const id = `sup-${Date.now()}`;
@@ -1335,6 +1372,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contracts,
         preWorkflow,
         postWorkflow,
+        postServiceWorkflow,
         bids,
         bidWorkflow,
         knowledgeCategories,
@@ -1363,6 +1401,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         batchAssociateProjects,
         updatePreWorkflow,
         updatePostWorkflow,
+        updatePostServiceWorkflow,
         updateBidWorkflow,
         allTags,
         addGlobalTag,

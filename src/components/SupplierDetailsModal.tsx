@@ -476,6 +476,39 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
                             )}
                           </div>
                         </div>
+
+                        {/* Display settlement batches if it is a multi-settlement contract */}
+                        {c.isMultiSettlement && c.settlements && c.settlements.length > 0 && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1.5">
+                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                              📊 结算批次 ({c.settlements.length})
+                            </div>
+                            <div className="grid grid-cols-1 gap-1">
+                              {c.settlements.map((batch, idx) => (
+                                <div key={batch.id || idx} className="flex items-center justify-between bg-slate-50/80 hover:bg-slate-50 border border-slate-100 rounded px-2 py-1 text-[10px] text-slate-600">
+                                  <div className="flex items-center space-x-1.5 min-w-0">
+                                    <span className="font-semibold text-slate-700 truncate">{batch.name}</span>
+                                    {batch.ship && (
+                                      <span className="text-[8px] font-medium text-slate-400 bg-slate-100 px-1 py-0.2 rounded whitespace-nowrap">
+                                        🚢 {batch.ship}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center space-x-1.5 flex-shrink-0">
+                                    {batch.amount && (
+                                      <span className="font-mono text-slate-500 font-semibold text-[9px]">
+                                        {batch.amount}
+                                      </span>
+                                    )}
+                                    <span className="inline-flex px-1 py-0.2 rounded text-[8px] font-bold bg-slate-200 text-slate-700 whitespace-nowrap">
+                                      {batch.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

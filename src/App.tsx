@@ -23,7 +23,9 @@ function AppInner() {
       case 'pre':
         return <PreProcurement />;
       case 'post':
-        return <PostProcurement />;
+        return <PostProcurement contractType="purchase" />;
+      case 'post-service':
+        return <PostProcurement contractType="service" />;
       case 'bid':
         return <Bidding />;
       case 'suppliers':
@@ -46,7 +48,9 @@ function AppInner() {
       case 'pre':
         return 'D:\\采购\\前置工作\\需求池管理\\A001_机油采购';
       case 'post':
-        return 'D:\\采购\\后置工作\\合同文件管理\\HH01-2026-015';
+        return 'D:\\采购\\后置工作\\采购合同文件管理\\HH01-2026-015';
+      case 'post-service':
+        return 'D:\\采购\\后置工作\\服务合同文件管理\\HH01-2026-015';
       case 'bid':
         return 'D:\\采购\\标书\\BiddingVault.db';
       case 'suppliers':

@@ -22,6 +22,16 @@ export const DEFAULT_POST_STEPS: WorkflowStep[] = [
   { id: 'post7', name: '🟢 合同执行中', color: 'green' },
 ];
 
+export const DEFAULT_POST_SERVICE_STEPS: WorkflowStep[] = [
+  { id: 'post_svc1', name: '签收单', color: 'green' },
+  { id: 'post_svc2', name: '对账单', color: 'yellow' },
+  { id: 'post_svc3', name: '审核', color: 'yellow' },
+  { id: 'post_svc4', name: '付款申请', color: 'yellow' },
+  { id: 'post_svc5', name: '付款审批', color: 'green' },
+  { id: 'post_svc6', name: '付款完成', color: 'blue' },
+  { id: 'post_svc7', name: '🟢 合同执行中', color: 'green' },
+];
+
 export const DEFAULT_BID_STEPS: WorkflowStep[] = [
   { id: 'b1', name: '收到招标信息', color: 'green' },
   { id: 'b2', name: '阅读招标文件', color: 'yellow' },

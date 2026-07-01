@@ -1,15 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { useAppState } from '../context/AppContext';
 import { WorkflowStep, ColorState } from '../types';
-import { DEFAULT_PRE_STEPS, DEFAULT_POST_STEPS, DEFAULT_BID_STEPS } from '../data';
+import { DEFAULT_PRE_STEPS, DEFAULT_POST_STEPS, DEFAULT_POST_SERVICE_STEPS, DEFAULT_BID_STEPS } from '../data';
 import { Plus, Trash2, GripVertical, RefreshCw, Eye, Edit3, Settings2, Database, Download, Upload, RotateCcw, AlertTriangle, FileCheck, Terminal, ShieldAlert, FolderOpen, Tag, RefreshCw as SpinIcon } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const {
     preWorkflow,
     postWorkflow,
+    postServiceWorkflow,
     updatePreWorkflow,
     updatePostWorkflow,
+    updatePostServiceWorkflow,
     backups,
     createBackup,
     restoreBackup,
@@ -32,7 +34,7 @@ export const Settings: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeWorkflowTab, setActiveWorkflowTab] = useState<'pre' | 'post' | 'bid'>('pre');
+  const [activeWorkflowTab, setActiveWorkflowTab] = useState<'pre' | 'post' | 'post-service' | 'bid'>('pre');
   
   // States for adding a new step
   const [newStepName, setNewStepName] = useState('');
@@ -47,13 +49,21 @@ export const Settings: React.FC = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const currentWorkflow = activeWorkflowTab === 'pre' ? preWorkflow : activeWorkflowTab === 'post' ? postWorkflow : bidWorkflow;
+  const currentWorkflow = activeWorkflowTab === 'pre' 
+    ? preWorkflow 
+    : activeWorkflowTab === 'post' 
+      ? postWorkflow 
+      : activeWorkflowTab === 'post-service'
+        ? postServiceWorkflow
+        : bidWorkflow;
 
   const handleUpdate = (updated: WorkflowStep[]) => {
     if (activeWorkflowTab === 'pre') {
       updatePreWorkflow(updated);
     } else if (activeWorkflowTab === 'post') {
       updatePostWorkflow(updated);
+    } else if (activeWorkflowTab === 'post-service') {
+      updatePostServiceWorkflow(updated);
     } else {
       updateBidWorkflow(updated);
     }
@@ -161,6 +171,8 @@ export const Settings: React.FC = () => {
         updatePreWorkflow(DEFAULT_PRE_STEPS);
       } else if (activeWorkflowTab === 'post') {
         updatePostWorkflow(DEFAULT_POST_STEPS);
+      } else if (activeWorkflowTab === 'post-service') {
+        updatePostServiceWorkflow(DEFAULT_POST_SERVICE_STEPS);
       } else {
         updateBidWorkflow(DEFAULT_BID_STEPS);
       }
@@ -259,7 +271,21 @@ export const Settings: React.FC = () => {
                 : 'bg-white hover:bg-slate-100 text-slate-500 border border-slate-200 shadow-3xs'
             }`}
           >
-            <span>📄 配置：后置合同流程</span>
+            <span>📄 配置：采购合同流程</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveWorkflowTab('post-service');
+              setNewStepName('');
+            }}
+            className={`px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-2 cursor-pointer ${
+              activeWorkflowTab === 'post-service'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-white hover:bg-slate-100 text-slate-500 border border-slate-200 shadow-3xs'
+            }`}
+          >
+            <span>⚙️ 配置：服务合同流程</span>
           </button>
 
           <button

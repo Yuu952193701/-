@@ -5,11 +5,16 @@ import { ItemDetailsModal } from './ItemDetailsModal';
 import { isOverdue, formatChineseDate } from '../data';
 import { Search, Plus, ArrowLeft, ArrowRight, Trash2, Edit2, FileText, CheckCircle, Clock, Link, AlertTriangle, Layers, X, FolderMinus, Tag } from 'lucide-react';
 
-export const PostProcurement: React.FC = () => {
+interface PostProcurementProps {
+  contractType?: 'purchase' | 'service';
+}
+
+export const PostProcurement: React.FC<PostProcurementProps> = ({ contractType = 'purchase' }) => {
   const {
     projects,
     contracts,
     postWorkflow,
+    postServiceWorkflow,
     addContract,
     updateContract,
     deleteContract,
@@ -22,6 +27,8 @@ export const PostProcurement: React.FC = () => {
     supplierCategories,
     addSupplier
   } = useAppState();
+
+  const currentWorkflow = contractType === 'service' ? postServiceWorkflow : postWorkflow;
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,16 +64,16 @@ export const PostProcurement: React.FC = () => {
 
   // Resolver for status color
   const getContractStatusColor = (statusName: string) => {
-    const step = postWorkflow.find(s => s.name === statusName);
+    const step = currentWorkflow.find(s => s.name === statusName);
     return step ? step.color : 'green';
   };
 
   // Check step transitions boundaries
   const canMove = (contract: Contract) => {
-    const currentIndex = postWorkflow.findIndex(s => s.name === contract.status);
+    const currentIndex = currentWorkflow.findIndex(s => s.name === contract.status);
     return {
       hasPrev: currentIndex > 0,
-      hasNext: currentIndex < postWorkflow.length - 1
+      hasNext: currentIndex < currentWorkflow.length - 1
     };
   };
 
@@ -151,7 +158,10 @@ export const PostProcurement: React.FC = () => {
       return;
     }
 
-    const isDuplicate = contracts.some(c => c.name.trim().toLowerCase() === newContractName.trim().toLowerCase());
+    const isDuplicate = contracts.some(c => {
+      const cType = c.contractType || 'purchase';
+      return cType === contractType && c.name.trim().toLowerCase() === newContractName.trim().toLowerCase();
+    });
     if (isDuplicate) {
       const proceed = window.confirm(`⚠️ 该合同名称【${newContractName.trim()}】已存在！\n是否确认继续新建重复名称的合同？`);
       if (!proceed) {
@@ -171,6 +181,7 @@ export const PostProcurement: React.FC = () => {
       remark: newContractBriefRemark.trim(),
       amount: newContractAmount.trim() || undefined,
       supplierId: newContractSupplierId || undefined,
+      contractType,
     });
 
     // Since addContract writes asynchronously, let's wait next tick or simply bind projects to newly created contract.
@@ -207,13 +218,25 @@ export const PostProcurement: React.FC = () => {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`确认删除后置合同【${name}】吗？\n\n此操作会自动断开与该合同绑定的需求项目的关联关系。此操作仅在系统内删除该合同履约流转记录，不会删除您电脑本地的任何实际对应文件或合同文件夹。`)) {
+    const typeLabel = contractType === 'service' ? '服务合同' : '采购合同';
+    if (window.confirm(`确认删除后置${typeLabel}【${name}】吗？\n\n此操作会自动断开与该合同绑定的需求项目的关联关系。此操作仅在系统内删除该合同履约流转记录，不会删除您电脑本地的任何实际对应文件或合同文件夹。`)) {
       deleteContract(id);
     }
   };
 
+  const typeContracts = contracts.filter(c => {
+    const cType = c.contractType || 'purchase';
+    return cType === contractType;
+  });
+
   // Filter logic
   const filteredContracts = contracts.filter(contract => {
+    // Filter by Contract Type
+    const matchesContractType = contractType === 'service'
+      ? contract.contractType === 'service'
+      : (contract.contractType === 'purchase' || !contract.contractType);
+    if (!matchesContractType) return false;
+
     // 1. Ship category tab matching
     const associatedShips = contract.ship.split(',').map(s => s.trim()).filter(Boolean);
     const isMultiShipContract = associatedShips.length >= 2;
@@ -235,8 +258,8 @@ export const PostProcurement: React.FC = () => {
     const associatedProjectsTags = associatedProjects.map(p => p.name.toLowerCase() + ' ' + p.code.toLowerCase()).join(' ');
     
     // Index multi-batch settlement details
-    const settlementDetails = contract.isMultiSettlement && contract.settlements
-      ? contract.settlements.map(s => `${s.name} ${s.status} ${s.remark || ''} ${s.ship || ''}`).join(' ').toLowerCase()
+    const settlementDetails = contract.settlements && contract.settlements.length > 0
+      ? contract.settlements.map(s => `${s.name} ${s.status} ${s.remark || ''} ${s.ship || ''} ${s.amount || ''}`).join(' ').toLowerCase()
       : '';
 
     // Find associated supplier name and contract amount
@@ -292,10 +315,10 @@ export const PostProcurement: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 tracking-tight flex items-center space-x-2">
-            <span>后置工作</span>
+            <span>后置工作 ({contractType === 'service' ? '服务合同' : '采购合同'})</span>
           </h2>
           <p className="text-sm text-slate-400 mt-0.5">
-            对起草会签完毕的合同进行到货接收、结算及付款周期跟踪。项目依<b>所属船舶</b>独立划分管理。
+            对会签完毕的{contractType === 'service' ? '服务' : '采购'}合同进行到货接收、结算及付款周期跟踪。项目依<b>所属船舶</b>独立划分管理。
           </p>
         </div>
         <button
@@ -306,7 +329,7 @@ export const PostProcurement: React.FC = () => {
           className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-style shadow-3xs cursor-pointer self-start md:self-center"
         >
           <Plus size={14} />
-          <span>新建后置合同</span>
+          <span>新建后置{contractType === 'service' ? '服务合同' : '采购合同'}</span>
         </button>
       </div>
 
@@ -323,10 +346,10 @@ export const PostProcurement: React.FC = () => {
               : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
-          🚢 全部合同 ({contracts.length})
+          🚢 全部合同 ({typeContracts.length})
         </button>
         {SHIPS.map(ship => {
-          const shipContractsCount = contracts.filter(c => {
+          const shipContractsCount = typeContracts.filter(c => {
             const associated = c.ship.split(',').map(s => s.trim()).filter(Boolean);
             return associated.length === 1 && associated[0] === ship;
           }).length;
@@ -355,7 +378,7 @@ export const PostProcurement: React.FC = () => {
               : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/40'
           }`}
         >
-          ⛓️ 多船舶 ({contracts.filter(c => c.ship.split(',').map(s => s.trim()).filter(Boolean).length >= 2).length})
+          ⛓️ 多船舶 ({typeContracts.filter(c => c.ship.split(',').map(s => s.trim()).filter(Boolean).length >= 2).length})
         </button>
       </div>
 
@@ -386,7 +409,7 @@ export const PostProcurement: React.FC = () => {
               className="w-full rounded-md border border-slate-200 p-1.5 text-xs bg-white focus:outline-none focus:border-blue-500 text-slate-600 font-medium"
             >
               <option value="all">📁 所有节点</option>
-              {postWorkflow.map(step => {
+              {currentWorkflow.map(step => {
                 const colorEmoji = step.color === 'yellow' ? '🟡' : step.color === 'green' ? '🟢' : step.color === 'blue' ? '🔵' : step.color === 'red' ? '🔴' : '⚪';
                 const hasEmoji = /^[^\w\s\u4e00-\u9fa5]{1,2}\s/.test(step.name);
                 const displayName = hasEmoji ? step.name : `${colorEmoji} ${step.name}`;
@@ -460,7 +483,7 @@ export const PostProcurement: React.FC = () => {
 
         {sortedContracts.length === 0 ? (
           <div className="bg-white border border-slate-200/60 rounded-xl p-12 text-center text-slate-400 text-sm">
-            没有查找到指定筛选条件下的后置合同项目。可在上面切换其他所属船舶，或新增合同。
+            没有查找到指定筛选条件下的后置${contractType === 'service' ? '服务' : '采购'}合同项目。可在上面切换其他所属船舶，或新增合同。
           </div>
         ) : (
           <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
@@ -703,11 +726,11 @@ export const PostProcurement: React.FC = () => {
                                     <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
                                       <button
                                         title="退回上一步"
-                                        disabled={postWorkflow.findIndex(step => step.name === s.status) <= 0}
+                                        disabled={currentWorkflow.findIndex(step => step.name === s.status) <= 0}
                                         onClick={() => {
-                                          const sIdx = postWorkflow.findIndex(step => step.name === s.status);
+                                          const sIdx = currentWorkflow.findIndex(step => step.name === s.status);
                                           if (sIdx > 0) {
-                                            const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: postWorkflow[sIdx - 1].name } : item);
+                                            const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: currentWorkflow[sIdx - 1].name } : item);
                                             updateContract(contract.id, { settlements: updated });
                                           }
                                         }}
@@ -717,11 +740,11 @@ export const PostProcurement: React.FC = () => {
                                       </button>
                                       <button
                                         title="流转下一步"
-                                        disabled={postWorkflow.findIndex(step => step.name === s.status) >= postWorkflow.length - 1}
+                                        disabled={currentWorkflow.findIndex(step => step.name === s.status) >= currentWorkflow.length - 1}
                                         onClick={() => {
-                                          const sIdx = postWorkflow.findIndex(step => step.name === s.status);
-                                          if (sIdx < postWorkflow.length - 1) {
-                                            const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: postWorkflow[sIdx + 1].name } : item);
+                                          const sIdx = currentWorkflow.findIndex(step => step.name === s.status);
+                                          if (sIdx < currentWorkflow.length - 1) {
+                                            const updated = contract.settlements!.map(item => item.id === s.id ? { ...item, status: currentWorkflow[sIdx + 1].name } : item);
                                             updateContract(contract.id, { settlements: updated });
                                           }
                                         }}
@@ -834,7 +857,7 @@ export const PostProcurement: React.FC = () => {
             
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 flex-shrink-0">
               <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2">
-                <span>➕ 新建后置合同及需求合并</span>
+                <span>➕ 新建后置${contractType === 'service' ? '服务' : '采购'}合同及需求合并</span>
               </h3>
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -979,8 +1002,8 @@ export const PostProcurement: React.FC = () => {
                     onChange={(e) => setNewContractStatus(e.target.value)}
                     className="w-full px-3 py-1.5 rounded-md border border-slate-200 text-xs focus:ring-1 focus:ring-blue-100 focus:border-blue-500 focus:outline-none bg-white font-semibold text-slate-700 cursor-pointer"
                   >
-                    <option value="">-- 系统默认第一阶段 ({postWorkflow[0]?.name || '合同签订'}) --</option>
-                    {postWorkflow.map(step => (
+                    <option value="">-- 系统默认第一阶段 ({currentWorkflow[0]?.name || '合同签订'}) --</option>
+                    {currentWorkflow.map(step => (
                       <option key={step.name} value={step.name}>{step.name}</option>
                     ))}
                   </select>
@@ -1366,7 +1389,7 @@ export const PostProcurement: React.FC = () => {
                   type="submit"
                   className="px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-3xs transition-all"
                 >
-                  确认建立后置合同
+                  确认建立后置${contractType === 'service' ? '服务' : '采购'}合同
                 </button>
               </div>
 

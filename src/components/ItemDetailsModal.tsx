@@ -20,6 +20,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
     bids,
     preWorkflow,
     postWorkflow,
+    postServiceWorkflow,
     bidWorkflow,
     updateProject,
     updateContract,
@@ -249,7 +250,11 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
     handleSaveField({ tags: updatedTags });
   };
 
-  const activeSteps = type === 'project' ? preWorkflow : type === 'contract' ? postWorkflow : bidWorkflow;
+  const activeSteps = type === 'project'
+    ? preWorkflow
+    : type === 'contract'
+      ? (contractItem?.contractType === 'service' ? postServiceWorkflow : postWorkflow)
+      : bidWorkflow;
 
   // Filter existing contracts that contain the selected project/bid's ship (allowing overlapping ships for multiselect)
   const currentShipsList = ship.split(',').map(s => s.trim()).filter(Boolean);
@@ -953,7 +958,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                               }}
                               className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
                             >
-                              {postWorkflow.map(step => {
+                              {activeSteps.map(step => {
                                 const colorEmoji = step.color === 'yellow' ? '🟡' : step.color === 'green' ? '🟢' : step.color === 'blue' ? '🔵' : step.color === 'red' ? '🔴' : '⚪';
                                 const hasEmoji = /^[^\w\s\u4e00-\u9fa5]{1,2}\s/.test(step.name);
                                 const displayName = hasEmoji ? step.name : `${colorEmoji} ${step.name}`;

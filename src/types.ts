@@ -82,6 +82,7 @@ export interface Contract {
   settlements?: SettlementBatch[];
   supplierId?: string; // 关联的供应商ID (对应公司)
   amount?: string; // 合同金额
+  contractType?: 'purchase' | 'service'; // 合同类型：采购合同或服务合同
 }
 
 export interface SettlementBatch {

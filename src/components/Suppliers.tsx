@@ -155,7 +155,7 @@ export const Suppliers: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-[calc(100vh-140px)] md:h-[calc(100vh-150px)] lg:h-[calc(100vh-160px)] flex flex-col space-y-4 min-h-0 overflow-hidden pb-1">
       
       {/* Upper Registry Header Banner */}
       <div className="bg-white rounded-xl p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -177,10 +177,10 @@ export const Suppliers: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-stretch flex-1 min-h-0">
         
         {/* Left Column: Category Sidebar */}
-        <div className="lg:col-span-1 bg-white border border-slate-200/80 rounded-xl p-4 space-y-4 shadow-2xs">
+        <div className="lg:col-span-1 bg-white border border-slate-200/80 rounded-xl p-4 flex flex-col min-h-0 h-full shadow-2xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <span className="text-xs font-bold text-slate-700 flex items-center space-x-1">
               <Tag size={12} className="text-blue-500" />
@@ -209,7 +209,7 @@ export const Suppliers: React.FC = () => {
           </form>
 
           {/* Categories List */}
-          <div className="space-y-1">
+          <div className="space-y-1 overflow-y-auto flex-1 pr-1 scrollbar-thin">
             <button
               onClick={() => setSelectedCatId('all')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors text-left ${
@@ -298,10 +298,10 @@ export const Suppliers: React.FC = () => {
         </div>
 
         {/* Right Column: Suppliers Master List */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-3 space-y-4 h-full flex flex-col min-h-0">
           
           {/* Top Search Filter and Metrics */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs flex flex-col md:flex-row gap-4 justify-between items-center">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs flex flex-col md:flex-row gap-4 justify-between items-center flex-shrink-0">
             
             {/* Search Input */}
             <div className="relative w-full md:max-w-md">
@@ -332,14 +332,14 @@ export const Suppliers: React.FC = () => {
 
           {/* Supplier Cards Grid - High visual hierarchy & minimal info */}
           {filteredSuppliers.length === 0 ? (
-            <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center text-slate-400 shadow-2xs">
+            <div className="bg-white border border-slate-200/80 rounded-xl p-12 text-center text-slate-400 shadow-2xs flex-1 flex flex-col justify-center">
               <Building2 className="mx-auto text-slate-300 mb-2" size={32} />
               <p className="text-sm font-semibold">暂无符合条件的供应商</p>
               <p className="text-xs text-slate-400 mt-1">您可以通过上方“登记新供应商”按钮为该分类增加实体供应商。</p>
             </div>
           ) : (
             <div 
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[72vh] overflow-y-auto pr-2 scrollbar-thin"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 overflow-y-auto pr-2 scrollbar-thin pb-2"
               style={{
                 scrollbarWidth: 'thin',
                 scrollBehavior: 'smooth'
@@ -385,19 +385,10 @@ export const Suppliers: React.FC = () => {
                     {/* Integrated mini relationship tag in card bottom */}
                     <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[10px] text-slate-400 font-mono">
                       <div className="flex items-center space-x-2">
-                        {(projCount > 0 || contCount > 0) ? (
-                          <>
-                            {projCount > 0 && (
-                              <span className="bg-teal-50 text-teal-700 font-semibold px-1.5 py-0.2 rounded">
-                                需求询价: {projCount}
-                              </span>
-                            )}
-                            {contCount > 0 && (
-                              <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.2 rounded">
-                                合作合同: {contCount}
-                              </span>
-                            )}
-                          </>
+                        {contCount > 0 ? (
+                          <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.2 rounded">
+                            合作合同: {contCount}
+                          </span>
                         ) : (
                           <span className="text-slate-300">无合作记录</span>
                         )}
