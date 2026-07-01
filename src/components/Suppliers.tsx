@@ -103,8 +103,17 @@ export const Suppliers: React.FC = () => {
       return;
     }
 
+    const trimmedName = newSupName.trim();
+    const existing = suppliers.find(s => s.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      alert(`供应商「${existing.name}」已存在，请勿重复登记！已自动为您打开该供应商详情。`);
+      setShowAddModal(false);
+      setSelectedSupplierIdForModal(existing.id);
+      return;
+    }
+
     const created = addSupplier({
-      name: newSupName.trim(),
+      name: trimmedName,
       categoryId: newSupCatId,
     });
 
@@ -329,7 +338,13 @@ export const Suppliers: React.FC = () => {
               <p className="text-xs text-slate-400 mt-1">您可以通过上方“登记新供应商”按钮为该分类增加实体供应商。</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[72vh] overflow-y-auto pr-2 scrollbar-thin"
+              style={{
+                scrollbarWidth: 'thin',
+                scrollBehavior: 'smooth'
+              }}
+            >
               {filteredSuppliers.map(sup => {
                 const categoryName = supplierCategories.find(c => c.id === sup.categoryId)?.name || '未分类';
                 

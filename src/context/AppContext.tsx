@@ -1142,7 +1142,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString(),
       contractStatus: '执行中',
       isMultiSettlement: false,
-      settlements: []
+      settlements: [],
+      amount: contractData.amount,
+      supplierId: contractData.supplierId
     };
 
     setContracts(prev => [newContract, ...prev]);

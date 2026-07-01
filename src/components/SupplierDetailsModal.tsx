@@ -431,6 +431,8 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
               ) : (
                 <div className="space-y-2 flex-1 overflow-y-auto pr-1">
                   {sortedContracts.map(c => {
+                    const step = postWorkflow.find(s => s.name === c.status);
+                    const statusColor = step ? step.color : 'green';
                     return (
                       <div 
                         key={c.id}
@@ -454,7 +456,12 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
                           
                           {/* Workflow state step badge */}
                           <div className="flex flex-col items-end gap-1.5">
-                            <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-600">
+                            <span className={`inline-flex px-1.5 py-0.2 rounded text-[9px] font-bold border ${
+                              statusColor === 'yellow' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                              statusColor === 'green' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                              statusColor === 'blue' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                              'bg-rose-50 text-rose-800 border-rose-200'
+                            }`}>
                               {c.status}
                             </span>
                             

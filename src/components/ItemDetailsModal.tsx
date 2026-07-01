@@ -178,9 +178,18 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
 
   const handleQuickAddAndSelect = () => {
     if (!quickSupName.trim()) return;
+    const trimmed = quickSupName.trim();
+    const existing = suppliers.find(s => s.name.trim().toLowerCase() === trimmed.toLowerCase());
+    if (existing) {
+      alert(`对应公司「${existing.name}」已存在，已直接为您选择该供应商。`);
+      handleAddInquirySupplier(existing.id);
+      setQuickSupName('');
+      setShowQuickAdd(false);
+      return;
+    }
     const catId = quickSupCatId || supplierCategories[0]?.id || '';
     const newSup = addSupplier({
-      name: quickSupName.trim(),
+      name: trimmed,
       categoryId: catId,
     });
     handleAddInquirySupplier(newSup.id);
@@ -201,9 +210,18 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
 
   const handleContractQuickAddAndSelect = () => {
     if (!quickSupName.trim()) return;
+    const trimmed = quickSupName.trim();
+    const existing = suppliers.find(s => s.name.trim().toLowerCase() === trimmed.toLowerCase());
+    if (existing) {
+      alert(`对应公司「${existing.name}」已存在，已直接为您选择该供应商。`);
+      handleSelectContractSupplier(existing.id);
+      setQuickSupName('');
+      setShowQuickAdd(false);
+      return;
+    }
     const catId = quickSupCatId || supplierCategories[0]?.id || '';
     const newSup = addSupplier({
-      name: quickSupName.trim(),
+      name: trimmed,
       categoryId: catId,
     });
     handleSelectContractSupplier(newSup.id);
