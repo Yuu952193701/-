@@ -562,7 +562,8 @@ export const PostProcurement: React.FC = () => {
                                   name: `第${newNum}期结算`,
                                   status: '签收单',
                                   remark: '',
-                                  ship: contractShips.length === 1 ? contractShips[0] : ''
+                                  ship: contractShips.length === 1 ? contractShips[0] : '',
+                                  amount: ''
                                 };
                                 updateContract(contract.id, {
                                   settlements: [...contract.settlements!, nextBatch]
@@ -595,6 +596,12 @@ export const PostProcurement: React.FC = () => {
                                         }`}>
                                           {s.status}
                                         </span>
+                                        {/* Batch Amount Tag */}
+                                        {s.amount && (
+                                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-3xs">
+                                            💰 {s.amount}
+                                          </span>
+                                        )}
                                         {/* Inline ship selector for multi-ship contract */}
                                         {contractShips.length >= 2 && (
                                           <select
@@ -618,7 +625,19 @@ export const PostProcurement: React.FC = () => {
                                           </span>
                                         )}
                                       </div>
-                                      {s.remark && <p className="text-[10px] text-slate-400 italic line-clamp-1">{s.remark}</p>}
+                                      
+                                      <div className="flex items-center space-x-2 flex-wrap text-[10px] text-slate-400 mt-0.5">
+                                        {s.dueDate && (
+                                          <span className="bg-slate-100 text-slate-600 font-medium px-1 rounded">
+                                            📅 {s.dueDate}
+                                          </span>
+                                        )}
+                                        {s.remark && (
+                                          <span className="italic line-clamp-1">
+                                            💬 {s.remark}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
 
                                     <div className="flex items-center space-x-1 flex-shrink-0 ml-2">

@@ -91,6 +91,7 @@ export interface SettlementBatch {
   dueDate?: string;  // 要求截止日期
   remark?: string;   // 批次备注说明
   ship?: string;     // 新增：该批次结算所属船舶 (针对多船舶合同)
+  amount?: string;   // 新增：批次结算金额
 }
 
 export const SHIPS = [

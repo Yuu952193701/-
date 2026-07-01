@@ -49,7 +49,7 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
 
   if (!supplier) {
     return createPortal(
-      <div className="fixed inset-0 bg-slate-950/20 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-y-0 right-0 left-0 md:left-52 bg-slate-950/20 backdrop-blur-xs z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl p-6 text-center shadow-lg max-w-sm w-full border border-slate-150">
           <p className="text-slate-500 text-sm">该供应商数据未找到</p>
           <button onClick={onClose} className="mt-4 px-4 py-2 bg-slate-100 rounded text-xs hover:bg-slate-200">
@@ -179,7 +179,7 @@ export const SupplierDetailsModal: React.FC<SupplierDetailsModalProps> = ({
   });
 
   return createPortal(
-    <div className="fixed inset-0 bg-slate-950/30 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4">
+    <div className="fixed inset-y-0 right-0 left-0 md:left-52 bg-slate-950/30 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl h-[92vh] md:h-[85vh] flex flex-col overflow-hidden animate-fade-in">
         
         {/* Modal Header */}

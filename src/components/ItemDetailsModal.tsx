@@ -837,7 +837,8 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                           id: `s-${Date.now()}-1`,
                           name: '第1期结算',
                           status: status || '签收单',
-                          remark: ''
+                          remark: '',
+                          amount: ''
                         };
                         setSettlements([firstBatch]);
                         setIsMultiSettlement(true);
@@ -872,7 +873,8 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                         id: `s-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                         name: `第${newNum}期结算`,
                         status: '签收单',
-                        remark: ''
+                        remark: '',
+                        amount: ''
                       };
                       const updated = [...settlements, newBatch];
                       setSettlements(updated);
@@ -919,7 +921,7 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                     {(() => {
                       const contractShips = ship.split(',').map(s => s.trim()).filter(Boolean);
                       return (
-                        <div className={`grid ${contractShips.length >= 2 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'} gap-3`}>
+                        <div className={`grid ${contractShips.length >= 2 ? 'grid-cols-1 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'} gap-3`}>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-1">
                               结算业务状态
@@ -958,6 +960,22 @@ export const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ itemId, type
                                 handleSaveField({ settlements: updated });
                               }}
                               className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                              本批结算金额 (元/$)
+                            </label>
+                            <input
+                              type="text"
+                              value={batch.amount || ''}
+                              onChange={(e) => {
+                                const updated = settlements.map(b => b.id === batch.id ? { ...b, amount: e.target.value } : b);
+                                setSettlements(updated);
+                                handleSaveField({ settlements: updated });
+                              }}
+                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700"
+                              placeholder="金额..."
                             />
                           </div>
                           {contractShips.length >= 2 && (
